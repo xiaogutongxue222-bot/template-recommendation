@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一键成片模板推荐策略模拟器</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous" onerror="loadBackupXLSX()"></script>
+  <script>
+    function loadBackupXLSX() {
+      console.warn('主CDN加载失败，尝试备用CDN...');
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js';
+      script.onerror = () => {
+        document.getElementById('fileStatus').innerText = 'XLSX库加载失败，请检查网络';
+        document.getElementById('fileStatus').style.color = '#ef4444';
+      };
+      document.head.appendChild(script);
+    }
+  </script>
+  <style>
+    :root {
+      --bg: #f6f9fc;
+      --card: #ffffff;
+      --accent: #2f7ef9;
+      --muted: #6b7280;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: #111827;
+    }
+    header {
+      padding: 16px 20px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
+      padding: 16px;
+      height: calc(100vh - 72px);
+    }
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    .field {
+      margin-bottom: 12px;
+    }
+    .field label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.15s ease;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: #e5e7eb; color: #111; }
+    .btn:hover { filter: brightness(0.97); }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+    }
+    .btn:disabled:hover {
+      filter: grayscale(0.5);
+    }
+    .sticky-note {
+      background: #eef4ff;
+      border: 1px solid #d7e2ff;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #1f3b7a;
+      margin-top: 12px;
+    }
+    .result-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .top-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .card-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px;
+      background: #fdfefe;
+    }
+    .card-item h4 {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .card-item .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .list-container {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .list-item {
+      display: grid;
+      grid-template-columns: 50px 1fr 100px;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid #f1f3f5;
+      align-items: center;
+      font-size: 13px;
+    }
+    .list-item:last-child { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #fff;
+      background: #8b5cf6;
+      margin-left: 4px;
+    }
+    .muted { color: var(--muted); }
+    @media (max-width: 1024px) {
+      main { grid-template-columns: 1fr; height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>一键成片模板推荐策略模拟器</h1>
+    <span class="muted" id="fileStatus">加载 data3.xlsx 中...</span>
+  </header>
+  <main>
+    <!-- 左侧参数面板 -->
+    <aside class="card">
+      <div class="section-title">
+        <span>参数调节</span>
+        <button class="btn btn-secondary" onclick="resetParams()">重置</button>
+      </div>
+      
+      <!-- 用户信息 -->
+      <div style="background:#f0f9ff;padding:12px;border-radius:8px;margin-bottom:16px;">
+        <h3 style="margin:0 0 12px 0;font-size:14px;color:#0369a1;">👤 用户信息</h3>
+        
+        <div class="field">
+          <label for="userDataSelect">个人数据表</label>
+          <select id="userDataSelect" onchange="switchUserData()">
+            <option value="">加载中...</option>
+          </select>
+        </div>
+        
+        <div class="field">
+          <label for="sceneSelect">当前结果场景（必选）</label>
+          <select id="sceneSelect" onchange="compute()">
+            <option value="">请选择场景</option>
+          </select>
+        </div>
+        
+        <div class="field">
+          <label for="userRatio">用户素材比例</label>
+          <select id="userRatio" onchange="compute()">
+            <option value="16:9">16:9</option>
+            <option value="9:16" selected>9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="3:4">3:4</option>
+            <option value="1:1">1:1</option>
+          </select>
+        </div>
+        
+        <div class="field">
+          <label>用户片段数</label>
+          <input id="userSegments" type="number" min="0" value="10" oninput="compute()">
+        </div>
+        
+        <!-- 用户统计信息 -->
+        <div id="userStats" style="margin-top:12px;padding-top:12px;border-top:1px solid #bae6fd;font-size:12px;color:#0c4a6e;">
+          <!-- 动态显示用户统计信息 -->
+        </div>
+      </div>
+      
+      <!-- 评分参数 -->
+      <div style="background:#fef3f2;padding:12px;border-radius:8px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;font-size:14px;color:#b91c1c;">📊 评分参数</h3>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:12px;margin:0;cursor:pointer;">
+              <input type="checkbox" id="enableNewRules" onchange="toggleNewRules()" checked style="cursor:pointer;">
+              启用E/F/G规则
+            </label>
+          </div>
+        </div>
+        
+        <div class="field">
+          <label>基础分</label>
+          <input id="baseScore" type="number" step="1" value="100" oninput="compute()">
+        </div>
+        
+        <div class="field">
+          <label>A 系数（场景导出PV）</label>
+          <input id="coefA" type="number" step="0.01" value="0.5" oninput="compute()">
+        </div>
+        
+        <div class="field">
+          <label>B 系数（场景使用-导出）</label>
+          <input id="coefB" type="number" step="0.01" value="0.07" oninput="compute()">
+        </div>
+        
+        <div class="field">
+          <label>C 系数（个人导出PV）</label>
+          <input id="coefC" type="number" step="0.1" value="60" oninput="compute()">
+        </div>
+        
+        <div class="field">
+          <label>D 系数（个人使用-导出）</label>
+          <input id="coefD" type="number" step="0.1" value="30" oninput="compute()">
+        </div>
+        
+        <hr style="margin:12px 0;border:none;border-top:1px solid #fee2e2;">
+        
+        <!-- E/F/G 参数区（可禁用） -->
+        <div id="newRulesContainer">
+          <div class="field">
+            <label>E - 比例完全匹配分</label>
+            <input id="scoreRatioMatch" type="number" value="0" oninput="compute()">
+          </div>
+          
+          <div class="field">
+            <label>E - 比例近似匹配分（扣分）</label>
+            <input id="scoreRatioNear" type="number" value="-200" oninput="compute()">
+          </div>
+          
+          <div class="field">
+            <label>E - 比例不匹配分（扣分）</label>
+            <input id="scoreRatioMismatch" type="number" value="-1000" oninput="compute()">
+          </div>
+          
+          <hr style="margin:12px 0;border:none;border-top:1px solid #fee2e2;">
+          
+          <div class="field">
+            <label>F - 片段匹配加分</label>
+            <input id="scoreSegmentMatch" type="number" value="20" oninput="compute()">
+          </div>
+          
+          <div class="field">
+            <label>F - 片段不匹配分（扣分）</label>
+            <input id="scoreSegmentMismatch" type="number" value="-20" oninput="compute()">
+          </div>
+          
+          <hr style="margin:12px 0;border:none;border-top:1px solid #fee2e2;">
+          
+          <div class="field">
+            <label>G - 常规模板时长分</label>
+            <input id="scoreRegularDuration" type="number" value="20" oninput="compute()">
+          </div>
+          
+          <div class="field">
+            <label>G - 长时长分（>30s）</label>
+            <input id="scoreLongDuration" type="number" value="30" oninput="compute()">
+          </div>
+          
+          <div class="field">
+            <label>G - 中时长分（>25s）</label>
+            <input id="scoreMediumDuration" type="number" value="20" oninput="compute()">
+          </div>
+        </div>
+      </div>
+      
+      <div class="sticky-note">
+        <strong>公式：</strong>分数 = 基础分 + A - B + C - D + ID分 <span style="color:#dc2626;">+ E + F + G</span><br>
+        <strong>A</strong> = 该模板在该场景的导出PV × 系数A<br>
+        <strong>B</strong> = 该模板在该场景的(使用-导出)PV × 系数B<br>
+        <strong>C</strong> = 该模板在个人数据的导出PV × 系数C<br>
+        <strong>D</strong> = 该模板在个人数据的(使用-导出)PV × 系数D<br>
+        <strong>ID分</strong> = (模板ID % 10000) / 10000<br>
+        <span style="color:#dc2626;"><strong>📌 E/F/G 新规则（可选）：</strong></span><br>
+        <strong>E (比例分)</strong> = 卡点/常规:0 | UGC: 完全匹配0 / 近似匹配(16:9↔4:3,9:16↔3:4):-200 / 其他:-1000<br>
+        <strong>F (片段分)</strong> = 常规:0 | 卡点/UGC: 用户段数/槽位数在0.90~1.10: +20 / 否则:-20<br>
+        <strong>G (时长分)</strong> = 常规:20 | UGC/卡点: >30s:30 / >25s:20 / 其他:0<br>
+        <span style="color:#dc2626;font-size:11px;">💡 不启用E/F/G时，相当于使用传统评分系统（E=F=G=0）</span><br><br>
+        <strong style="color:#ef4444;">⚠️ 过滤规则（按顺序应用）：</strong><br>
+        1. 只展示在模板信息表中存在的模板<br>
+        2. 不推荐模板ID为 11000000 和 -1 的模板<br>
+        3. 只推荐模板信息中"场景"列包含当前选择场景的模板<br>
+        4. 场景列只有"通用"的模板不会被推荐<br>
+        • 特殊规则：ski 和 skiing 已合并为 ski<br><br>
+        <strong style="color:#2f7ef9;">📊 个人数据表说明：</strong><br>
+        • 有场景字段的表：C/D 按模板ID+场景匹配<br>
+        • 无场景字段的表：C/D 按模板ID匹配（聚合数据）<br>
+        • 可在上方切换使用不同的个人数据表<br><br>
+        <strong style="color:#10b981;">🏆 TOP10 标识说明：</strong><br>
+        • <span style="background:#10b981;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">个人TOP10</span> = 当前个人数据表中导出率前10的模板<br>
+        • <span style="background:#3b82f6;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">全量TOP10</span> = 当前场景下全体数据导出率前10的模板（需使用PV≥100）
+      </div>
+    </aside>
+
+    <!-- 右侧结果展示 -->
+    <section class="result-layout">
+      <div class="card">
+        <div class="section-title">
+          <span>Top 10 模板</span>
+          <span class="muted" id="topSummary"></span>
+        </div>
+        <div class="top-cards" id="topCards">
+          <div class="muted">请先选择场景</div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="section-title">
+          <span>全部排序结果</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="muted" id="listCount"></span>
+            <button class="btn btn-primary" id="exportBtn" onclick="exportResults()" style="font-size:12px;padding:6px 12px;" disabled>
+              📥 导出结果
+            </button>
+          </div>
+        </div>
+        <div class="list-container" id="listContainer">
+          <div class="muted" style="padding:20px;">请先选择场景</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // 全局数据
+    let templateData = [];      // 模板数据（场景维度统计）
+    let userData = [];           // 个人数据
+    let templateInfo = {};       // 模板信息（id -> {name, type}）
+    let scenes = [];             // 所有场景列表
+    let currentResults = [];     // 当前计算结果（用于导出）
+    let currentScene = '';       // 当前选择的场景
+    let workbook = null;         // Excel工作簿对象
+    let availableUserSheets = []; // 可用的个人数据表列表
+    let currentUserSheet = '';   // 当前使用的个人数据表
+
+    // 清理场景名称
+    function cleanScene(raw) {
+      if (!raw) return '';
+      const str = String(raw);
+      if (str.startsWith('{')) {
+        try {
+          const obj = JSON.parse(str);
+          return obj.video_group_scene || '';
+        } catch (e) {
+          return '';
+        }
+      }
+      if (str.startsWith('PRO_VID')) return '';
+      return str;
+    }
+
+    // 标准化场景名称（合并 skiing -> ski）
+    function normalizeScene(scene) {
+      if (!scene) return '';
+      const s = String(scene).toLowerCase();
+      if (s === 'skiing') return 'ski';
+      return scene;
+    }
+
+    // 计算ID分
+    function calcIdScore(id) {
+      const num = Math.abs(Number(id)) || 0;
+      return ((num >= 10000000 ? num % 10000 : num) % 10000) / 10000;
+    }
+
+    // 计算E分（模板比例分）
+    function calcRatioScore(templateType, templateRatio, userRatio, scores) {
+      // 卡点和常规模板：0分
+      if (templateType === '卡点' || templateType === '常规') {
+        return 0;
+      }
+      
+      // UGC模板
+      if (templateType === 'ugc' || templateType === 'UGC') {
+        // 比例为0（未设置）：返回0分
+        if (templateRatio === '0' || !templateRatio) {
+          return 0;
+        }
+        
+        // 完全匹配：0分
+        if (templateRatio === userRatio) {
+          return scores.match;
+        }
+        
+        // 近似匹配：16:9↔4:3 或 9:16↔3:4
+        const nearPairs = [
+          ['16:9', '4:3'],
+          ['4:3', '16:9'],
+          ['9:16', '3:4'],
+          ['3:4', '9:16']
+        ];
+        
+        for (const [a, b] of nearPairs) {
+          if ((templateRatio === a && userRatio === b) || 
+              (templateRatio === b && userRatio === a)) {
+            return scores.near;
+          }
+        }
+        
+        // 其他情况：不匹配
+        return scores.mismatch;
+      }
+      
+      return 0;
+    }
+
+    // 计算F分（模板片段分）
+    function calcSegmentScore(templateType, templateSlots, userSegments, scores) {
+      // 常规模板：0分
+      if (templateType === '常规') {
+        return 0;
+      }
+      
+      // 卡点/UGC模板
+      if ((templateType === '卡点' || templateType === 'ugc' || templateType === 'UGC') && 
+          templateSlots > 0 && userSegments > 0) {
+        const ratio = userSegments / templateSlots;
+        // 在 0.90 ~ 1.10 之间：加分
+        if (ratio >= 0.90 && ratio <= 1.10) {
+          return scores.match;
+        } else {
+          return scores.mismatch;
+        }
+      }
+      
+      return 0;
+    }
+
+    // 计算G分（模板时长分）
+    function calcDurationScore(templateType, duration, scores) {
+      // 常规模板：固定分数
+      if (templateType === '常规') {
+        return scores.regular;
+      }
+      
+      // UGC/卡点模板
+      if (templateType === '卡点' || templateType === 'ugc' || templateType === 'UGC') {
+        if (duration > 30) {
+          return scores.long;
+        } else if (duration > 25) {
+          return scores.medium;
+        } else {
+          return 0;
+        }
+      }
+      
+      return 0;
+    }
+
+    // 加载个人数据表
+    function loadUserData(userSheetName) {
+      if (!workbook || !userSheetName) {
+        console.error('工作簿未加载或未指定个人数据表');
+        return;
+      }
+      
+      const userSheet = workbook.Sheets[userSheetName];
+      if (!userSheet) {
+        console.error(`未找到个人数据表: ${userSheetName}`);
+        return;
+      }
+      
+      // 先尝试默认读取，检查第一行是否是表头
+      let raw = XLSX.utils.sheet_to_json(userSheet);
+      console.log(`读取个人数据表: ${userSheetName}, ${raw.length} 条原始记录`);
+      
+      if (raw.length > 0) {
+        console.log('第一条数据示例:', raw[0]);
+        const firstKeys = Object.keys(raw[0]);
+        console.log('检测到的列名:', firstKeys);
+        
+        // 检查是否第一行是"表格 1"之类的（需要跳过）
+        if (firstKeys.some(k => k.includes('表格') || k.includes('Unnamed'))) {
+          console.log('检测到需要跳过第一行，重新读取...');
+          raw = XLSX.utils.sheet_to_json(userSheet, { range: 1 });
+          console.log(`重新读取后: ${raw.length} 条记录`);
+          if (raw.length > 0) {
+            console.log('重新读取后的第一条:', raw[0]);
+            console.log('重新读取后的列名:', Object.keys(raw[0]));
+          }
+        }
+      }
+      
+      // 检查是否有场景字段
+      const hasSceneField = raw.length > 0 && ('场景' in raw[0]);
+      console.log(`个人数据是否包含场景字段: ${hasSceneField}`);
+      
+      userData = raw.map(r => {
+        // 尝试不同的列名变体
+        const templateId = r['模板id'] || r['模板ID'] || r['template_id'] || '';
+        const usePv = Number(r['使用pv'] || r['使用PV'] || r['use_pv'] || 0);
+        const exportPv = Number(r['导出pv'] || r['导出PV'] || r['export_pv'] || 0);
+        // 读取导出率，如果为空或NaN，则自动计算
+        let exportRate = Number(r['导出率'] || r['export_rate']);
+        if (isNaN(exportRate) || exportRate === 0) {
+          exportRate = usePv > 0 ? exportPv / usePv : 0;
+        }
+        
+        if (hasSceneField) {
+          // 有场景字段：按模板ID+场景匹配
+          const sceneVal = r['场景'] || r['scene'] || '';
+          const cleanedScene = cleanScene(sceneVal);
+          return {
+            id: String(templateId),
+            scene: normalizeScene(cleanedScene),
+            usePv: usePv,
+            exportPv: exportPv,
+            exportRate: exportRate,
+            hasScene: true
+          };
+        } else {
+          // 无场景字段：只按模板ID匹配（聚合数据）
+          return {
+            id: String(templateId),
+            scene: null,
+            usePv: usePv,
+            exportPv: exportPv,
+            exportRate: exportRate,
+            hasScene: false
+          };
+        }
+      }).filter(r => r.id && r.id !== '模板id' && r.id !== 'template_id');
+      
+      console.log(`个人数据处理后: ${userData.length} 条有效记录`);
+      if (userData.length > 0) {
+        console.log('个人数据第一条示例:', userData[0]);
+      }
+      
+      currentUserSheet = userSheetName;
+      
+      // 更新状态栏显示
+      const statusEl = document.getElementById('fileStatus');
+      const statusText = statusEl.innerText;
+      if (statusText.includes('已加载')) {
+        const parts = statusText.split('，');
+        parts[1] = `${userData.length} 条个人数据（${userSheetName}${hasSceneField ? '，区分场景' : '，聚合数据'}）`;
+        statusEl.innerText = parts.join('，');
+      }
+      
+      // 渲染用户统计信息
+      renderUserStats();
+    }
+    
+    // 渲染用户统计信息
+    function renderUserStats() {
+      const statsContainer = document.getElementById('userStats');
+      
+      if (!userData || userData.length === 0) {
+        statsContainer.innerHTML = '<div style="color:#64748b;">暂无个人数据</div>';
+        return;
+      }
+      
+      const hasSceneData = userData.length > 0 && userData[0].hasScene;
+      
+      // 判断是否需要按场景区分显示：只有"个人数据"（第一个表，无数字）才按场景区分
+      const shouldSeparateByScene = hasSceneData && currentUserSheet === '个人数据';
+      
+      // 1. 计算整体导出率（所有数据）
+      const totalUsePv = userData.reduce((sum, u) => sum + u.usePv, 0);
+      const totalExportPv = userData.reduce((sum, u) => sum + u.exportPv, 0);
+      const overallExportRate = totalUsePv > 0 ? (totalExportPv / totalUsePv * 100) : 0;
+      
+      // 2. 统计场景使用情况（如果有场景字段）
+      let topScenes = [];
+      
+      if (hasSceneData) {
+        // 按场景统计使用PV
+        const sceneStats = {};
+        userData.forEach(u => {
+          if (u.scene) {
+            if (!sceneStats[u.scene]) {
+              sceneStats[u.scene] = 0;
+            }
+            sceneStats[u.scene] += u.usePv;
+          }
+        });
+        
+        // 排序并取前2
+        topScenes = Object.entries(sceneStats)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 2)
+          .map(([scene, pv]) => `${scene}(${pv}PV)`);
+      }
+      
+      // 3. 计算Top10模板
+      let top10Data;
+      
+      if (shouldSeparateByScene) {
+        // "个人数据"表：按场景区分，不聚合
+        top10Data = userData.map(u => ({
+          id: u.id,
+          scene: u.scene,
+          usePv: u.usePv,
+          exportPv: u.exportPv,
+          exportRate: u.exportRate || 0,
+          scenes: [u.scene],
+          isSeparated: true
+        }));
+      } else if (hasSceneData) {
+        // "个人数据2-6"有场景数据：按模板ID聚合
+        const templateAggregated = {};
+        userData.forEach(u => {
+          if (!templateAggregated[u.id]) {
+            templateAggregated[u.id] = {
+              id: u.id,
+              usePv: 0,
+              exportPv: 0,
+              scenes: []
+            };
+          }
+          templateAggregated[u.id].usePv += u.usePv;
+          templateAggregated[u.id].exportPv += u.exportPv;
+          if (u.scene && !templateAggregated[u.id].scenes.includes(u.scene)) {
+            templateAggregated[u.id].scenes.push(u.scene);
+          }
+        });
+        
+        // 计算聚合后的导出率
+        top10Data = Object.values(templateAggregated).map(t => ({
+          ...t,
+          exportRate: t.usePv > 0 ? t.exportPv / t.usePv : 0,
+          isSeparated: false
+        }));
+      } else {
+        // 没有场景数据：直接使用
+        top10Data = userData.map(u => ({
+          id: u.id,
+          usePv: u.usePv,
+          exportPv: u.exportPv,
+          exportRate: u.exportRate || 0,
+          scenes: [],
+          isSeparated: false
+        }));
+      }
+      
+      // 按导出率排序并取前10
+      const sortedByRate = top10Data.sort((a, b) => (b.exportRate || 0) - (a.exportRate || 0));
+      const top10 = sortedByRate.slice(0, 10);
+      
+      // 生成HTML
+      const templateCount = hasSceneData ? top10Data.length : userData.length;
+      
+      let html = `
+        <div style="margin-bottom:8px;">
+          <strong>📊 整体导出率：</strong><span style="color:#0369a1;font-weight:bold;">${overallExportRate.toFixed(2)}%</span>
+          <span style="color:#64748b;font-size:11px;margin-left:4px;">(${templateCount}个模板)</span>
+        </div>
+      `;
+      
+      if (hasSceneData && topScenes.length > 0) {
+        html += `
+          <div style="margin-bottom:8px;">
+            <strong>🎯 使用最多的场景：</strong>${topScenes.join('、')}
+          </div>
+        `;
+      } else if (!hasSceneData) {
+        html += `
+          <div style="margin-bottom:8px;">
+            <strong>📦 数据类型：</strong>聚合数据（无场景区分）
+          </div>
+        `;
+      }
+      
+      html += `
+        <div style="margin-top:8px;">
+          <strong>🏆 个人TOP10模板：</strong>
+          <div style="max-height:200px;overflow-y:auto;margin-top:4px;background:#fff;padding:8px;border-radius:4px;border:1px solid #e0f2fe;">
+      `;
+      
+      top10.forEach((t, i) => {
+        const info = templateInfo[t.id] || {};
+        const name = info.name || `模板${t.id}`;
+        const rate = ((t.exportRate || 0) * 100).toFixed(2);
+        
+        // 显示场景信息
+        let sceneText = '';
+        if (t.isSeparated && t.scene) {
+          // "个人数据"表：显示单个场景
+          sceneText = `<span style="color:#64748b;font-size:10px;">[${t.scene}]</span>`;
+        } else if (hasSceneData && t.scenes && t.scenes.length > 0) {
+          // 其他有场景的表：显示场景列表
+          sceneText = `<span style="color:#64748b;font-size:10px;">[${t.scenes.join(',')}]</span>`;
+        }
+        
+        html += `
+          <div style="font-size:11px;padding:3px 0;border-bottom:1px solid #f0f9ff;display:flex;justify-content:space-between;">
+            <span style="color:#0c4a6e;">
+              ${i + 1}. ${name} ${sceneText}
+            </span>
+            <span style="color:#0369a1;font-weight:bold;">${rate}%</span>
+          </div>
+        `;
+      });
+      
+      html += `
+          </div>
+        </div>
+      `;
+      
+      statsContainer.innerHTML = html;
+    }
+
+    // 加载数据
+    async function loadData() {
+      try {
+        console.log('开始加载 data3.xlsx...');
+        const res = await fetch('data3.xlsx');
+        console.log('Fetch响应:', res.status, res.statusText);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        
+        const buf = await res.arrayBuffer();
+        console.log('文件大小:', buf.byteLength, 'bytes');
+        workbook = XLSX.read(buf, { type: 'array' });
+        const wb = workbook; // 向后兼容
+        console.log('工作表:', wb.SheetNames);
+        
+        // 检测所有个人数据表（以"个人数据"开头的工作表）
+        availableUserSheets = wb.SheetNames.filter(name => name.startsWith('个人数据'));
+        console.log('可用的个人数据表:', availableUserSheets);
+        
+        // 读取模板数据表
+        const tplSheet = wb.Sheets['模板数据'];
+        if (tplSheet) {
+          const raw = XLSX.utils.sheet_to_json(tplSheet);
+          const tempData = raw.map(r => {
+            const cleanedScene = cleanScene(r['场景'] || '');
+            const usePv = Number(r['finish_analyze_pv'] || r['使用pv'] || 0);
+            const exportPv = Number(r['export_pv'] || r['导出pv'] || 0);
+            // 读取导出率，如果为空或NaN，则自动计算
+            let exportRate = Number(r['导出率']);
+            if (isNaN(exportRate) || exportRate === 0) {
+              exportRate = usePv > 0 ? exportPv / usePv : 0;
+            }
+            return {
+              id: String(r['模板id'] || ''),
+              scene: normalizeScene(cleanedScene), // 标准化场景名称
+              originalScene: cleanedScene, // 保留原始场景用于调试
+              usePv: usePv,
+              exportPv: exportPv,
+              exportRate: exportRate // 添加导出率字段（自动计算）
+            };
+          }).filter(r => r.id && r.scene);
+          
+          // 合并同一模板在同一场景的重复记录
+          const mergedMap = {};
+          tempData.forEach(r => {
+            const key = `${r.id}_${r.scene}`;
+            if (mergedMap[key]) {
+              // 如果已存在，累加PV值
+              mergedMap[key].usePv += r.usePv;
+              mergedMap[key].exportPv += r.exportPv;
+              // 重新计算导出率
+              mergedMap[key].exportRate = mergedMap[key].usePv > 0 ? mergedMap[key].exportPv / mergedMap[key].usePv : 0;
+              console.log(`合并重复记录：模板${r.id}在场景${r.scene}，累加后使用PV=${mergedMap[key].usePv}，导出PV=${mergedMap[key].exportPv}`);
+            } else {
+              mergedMap[key] = r;
+            }
+          });
+          
+          templateData = Object.values(mergedMap);
+          console.log(`模板数据：原始${tempData.length}条 → 去重后${templateData.length}条`);
+        }
+        
+        // 初始化个人数据表选择器
+        const userDataSelect = document.getElementById('userDataSelect');
+        if (availableUserSheets.length > 0) {
+          // 智能选择：优先选择序号最大的个人数据表（如个人数据3 > 个人数据2 > 个人数据）
+          const sortedSheets = [...availableUserSheets].sort((a, b) => {
+            const numA = parseInt(a.replace('个人数据', '') || '0');
+            const numB = parseInt(b.replace('个人数据', '') || '0');
+            return numB - numA;  // 降序排列
+          });
+          const defaultSheet = sortedSheets[0];
+          
+          // 按序号排序显示（降序：3, 2, 1）
+          userDataSelect.innerHTML = sortedSheets.map(name => 
+            `<option value="${name}" ${name === defaultSheet ? 'selected' : ''}>${name}</option>`
+          ).join('');
+          
+          // 加载默认的个人数据表
+          loadUserData(defaultSheet);
+        } else {
+          userDataSelect.innerHTML = '<option value="">未找到个人数据表</option>';
+        }
+        
+        // 读取模板信息表（优先读取模板信息2，但也合并模板信息表以确保完整性）
+        const infoSheets = ['模板信息2', '模板信息'].filter(name => wb.SheetNames.includes(name));
+        
+        if (infoSheets.length === 0) {
+          throw new Error('未找到模板信息表');
+        }
+        
+        console.log('读取模板信息表:', infoSheets);
+        
+        // 合并多个模板信息表
+        infoSheets.forEach(infoSheetName => {
+          const infoSheet = wb.Sheets[infoSheetName];
+          if (infoSheet) {
+            const raw = XLSX.utils.sheet_to_json(infoSheet, { range: 1 }); // 从第2行开始读取
+            console.log(`  ${infoSheetName}: ${raw.length} 条原始记录`);
+            if (raw.length > 0 && infoSheetName === infoSheets[0]) {
+              console.log('  第一条数据示例:', raw[0]);
+            }
+            
+            // 合并重复的模板ID
+            raw.forEach(r => {
+              const id = String(r['模板id'] || '');
+              const name = r['模板名称'] || '';
+              const type = r['模板类型'] || '';
+              const sceneStr = String(r['场景'] || '');
+              
+              // 新增字段（来自模板信息2）
+              const duration = Number(r['模板时长'] || 0);
+              const slots = Number(r['模板槽位数'] || 0);
+              const ratio = String(r['模板比例(假)'] || r['模板比例'] || '0');
+              
+              // 过滤表头行
+              if (id && id !== '模板id' && name && name !== '模板名称') {
+                // 解析场景列表（逗号分隔）
+                const sceneList = sceneStr.split(/[,，]/).map(s => s.trim()).filter(s => s);
+                
+                // 如果模板ID已存在，合并场景
+                if (templateInfo[id]) {
+                  // 合并场景列表并去重
+                  const existingScenes = templateInfo[id].scenes || [];
+                  const mergedScenes = [...new Set([...existingScenes, ...sceneList])];
+                  templateInfo[id].scenes = mergedScenes;
+                  // 如果名称更详细，更新名称
+                  if (name.length > templateInfo[id].name.length) {
+                    templateInfo[id].name = name;
+                  }
+                  // 更新其他字段（保留非零值）
+                  if (duration > 0) templateInfo[id].duration = duration;
+                  if (slots > 0) templateInfo[id].slots = slots;
+                  if (ratio && ratio !== '0') templateInfo[id].ratio = ratio;
+                  // 如果旧数据缺少type但新数据有，更新type
+                  if (!templateInfo[id].type && type) templateInfo[id].type = type;
+                } else {
+                  templateInfo[id] = { 
+                    name, 
+                    type, 
+                    scenes: sceneList,
+                    duration: duration,
+                    slots: slots,
+                    ratio: ratio
+                  };
+                }
+              }
+            });
+          }
+        });
+        
+        console.log('合并后的唯一模板数量:', Object.keys(templateInfo).length);
+        // 打印前几个模板的完整信息
+        Object.entries(templateInfo).slice(0, 3).forEach(([id, info]) => {
+          console.log(`模板 ${id}: ${info.name}, 类型:${info.type}, 场景:${info.scenes}, 时长:${info.duration}s, 槽位:${info.slots}, 比例:${info.ratio}`);
+        });
+        
+        // 提取场景列表（已经标准化过，skiing 已转为 ski）
+        scenes = [...new Set(templateData.map(t => t.scene))].sort();
+        console.log('可选场景列表:', scenes);
+        
+        // 更新场景下拉框
+        const select = document.getElementById('sceneSelect');
+        select.innerHTML = '<option value="">请选择场景</option>' + 
+          scenes.map(s => `<option value="${s}">${s}</option>`).join('');
+        
+        // 默认选择第一个场景
+        if (scenes.length > 0) {
+          select.value = scenes[0];
+        }
+        
+        const infoCount = Object.keys(templateInfo).length;
+        const rawInfoCount = wb.Sheets['模板信息'] ? 
+          XLSX.utils.sheet_to_json(wb.Sheets['模板信息'], { range: 1 }).length : 0;
+        const statusText = rawInfoCount > infoCount 
+          ? `✓ 已加载 ${templateData.length} 条模板数据，${userData.length} 条个人数据，${infoCount} 个唯一模板（原始${rawInfoCount}条，已合并重复）`
+          : `✓ 已加载 ${templateData.length} 条模板数据，${userData.length} 条个人数据，${infoCount} 条模板信息`;
+        document.getElementById('fileStatus').innerText = statusText;
+        
+        console.log('数据加载完成');
+        compute();
+      } catch (e) {
+        const errMsg = '加载失败: ' + e.message;
+        document.getElementById('fileStatus').innerText = errMsg;
+        document.getElementById('fileStatus').style.color = '#ef4444';
+        document.getElementById('topCards').innerHTML = `<div style="color:#ef4444;padding:20px;">${errMsg}<br><br>请确保：<br>1. 使用 http://localhost:8000 访问（不是 file://）<br>2. 文件 data3.xlsx 在同目录<br>3. 查看浏览器控制台获取详细错误</div>`;
+        console.error('加载错误详情:', e);
+        console.error('错误堆栈:', e.stack);
+      }
+    }
+
+    // 切换新规则开关
+    function toggleNewRules() {
+      const enabled = document.getElementById('enableNewRules').checked;
+      const container = document.getElementById('newRulesContainer');
+      
+      if (enabled) {
+        container.style.opacity = '1';
+        container.style.pointerEvents = 'auto';
+      } else {
+        container.style.opacity = '0.4';
+        container.style.pointerEvents = 'none';
+      }
+      
+      // 重新计算
+      compute();
+    }
+
+    // 计算推荐结果
+    function compute() {
+      const scene = document.getElementById('sceneSelect').value;
+      
+      if (!scene) {
+        document.getElementById('topCards').innerHTML = '<div class="muted">请先选择场景</div>';
+        document.getElementById('listContainer').innerHTML = '<div class="muted" style="padding:20px;">请先选择场景</div>';
+        document.getElementById('topSummary').innerText = '';
+        document.getElementById('listCount').innerText = '';
+        document.getElementById('exportBtn').disabled = true;
+        currentResults = [];
+        currentScene = '';
+        return;
+      }
+      
+      // 启用导出按钮
+      document.getElementById('exportBtn').disabled = false;
+      
+      // 获取参数
+      const baseScore = Number(document.getElementById('baseScore').value) || 0;
+      const coefA = Number(document.getElementById('coefA').value) || 0;
+      const coefB = Number(document.getElementById('coefB').value) || 0;
+      const coefC = Number(document.getElementById('coefC').value) || 0;
+      const coefD = Number(document.getElementById('coefD').value) || 0;
+      
+      // 筛选该场景的数据
+      let sceneData = templateData.filter(t => t.scene === scene);
+      const beforeFilterCount = sceneData.length;
+      
+      // 1. 过滤：只保留在模板信息表中存在的模板
+      sceneData = sceneData.filter(t => {
+        if (!templateInfo[t.id]) {
+          console.log(`过滤：模板${t.id}不在模板信息表中`);
+          return false;
+        }
+        return true;
+      });
+      
+      const afterInfoFilterCount = sceneData.length;
+      
+      // 2. ID黑名单过滤：过滤掉不推荐的模板ID
+      const blacklistIds = ['11000000', '-1'];
+      sceneData = sceneData.filter(t => {
+        if (blacklistIds.includes(String(t.id))) {
+          console.log(`过滤：模板${t.id}在黑名单中`);
+          return false;
+        }
+        return true;
+      });
+      
+      const afterBlacklistCount = sceneData.length;
+      
+      // 3. 场景过滤：只保留模板信息中场景列包含当前场景的模板
+      // 过滤掉场景只有"通用"的模板
+      sceneData = sceneData.filter(t => {
+        const info = templateInfo[t.id];
+        // 由于前面已经过滤掉不在模板信息表中的模板，这里 info 应该总是存在
+        if (!info || !info.scenes || info.scenes.length === 0) {
+          console.log(`过滤：模板${t.id}(${info?.name || '未知'})没有场景信息`);
+          return false;
+        }
+        
+        // 如果场景列表只有"通用"，则不推荐
+        if (info.scenes.length === 1 && info.scenes[0] === '通用') {
+          console.log(`过滤：模板${t.id}(${info.name})只有"通用"场景`);
+          return false;
+        }
+        
+        // 检查场景列表是否包含当前选择的场景
+        // 特殊处理：如果选择 ski，也匹配 skiing
+        const sceneToMatch = scene.toLowerCase();
+        const matched = info.scenes.some(s => {
+          const infoScene = s.toLowerCase();
+          if (sceneToMatch === 'ski') {
+            return infoScene === 'ski' || infoScene === 'skiing';
+          }
+          return infoScene === sceneToMatch;
+        });
+        
+        if (!matched) {
+          console.log(`过滤：模板${t.id}(${info.name})的场景[${info.scenes.join(',')}]不包含${scene}`);
+        }
+        return matched;
+      });
+      
+      console.log(`场景"${scene}"：初始${beforeFilterCount}个 → 模板信息表过滤后${afterInfoFilterCount}个 → 黑名单过滤后${afterBlacklistCount}个 → 场景匹配过滤后${sceneData.length}个`);
+      
+      if (sceneData.length === 0) {
+        document.getElementById('topCards').innerHTML = `<div class="muted">场景"${scene}"暂无符合条件的模板</div>`;
+        document.getElementById('listContainer').innerHTML = '<div class="muted" style="padding:20px;">暂无符合条件的模板</div>';
+        document.getElementById('exportBtn').disabled = true;
+        currentResults = [];
+        currentScene = '';
+        return;
+      }
+      
+      // 建立个人数据映射
+      const userMap = {};
+      const userHasScene = userData.length > 0 && userData[0].hasScene;
+      
+      userData.forEach(u => {
+        if (userHasScene) {
+          // 有场景字段：按模板ID_场景匹配
+          const key = `${u.id}_${u.scene}`;
+          userMap[key] = u;
+        } else {
+          // 无场景字段：只按模板ID匹配（聚合数据）
+          userMap[u.id] = u;
+        }
+      });
+      
+      console.log(`个人数据匹配模式: ${userHasScene ? '模板ID+场景' : '仅模板ID（聚合）'}`);
+      
+      // 获取用户参数
+      const userRatio = document.getElementById('userRatio').value;
+      const userSegments = Number(document.getElementById('userSegments').value) || 0;
+      
+      // 获取E/F/G评分参数
+      const ratioScores = {
+        match: Number(document.getElementById('scoreRatioMatch').value) || 0,
+        near: Number(document.getElementById('scoreRatioNear').value) || -200,
+        mismatch: Number(document.getElementById('scoreRatioMismatch').value) || -1000
+      };
+      
+      const segmentScores = {
+        match: Number(document.getElementById('scoreSegmentMatch').value) || 20,
+        mismatch: Number(document.getElementById('scoreSegmentMismatch').value) || -20
+      };
+      
+      const durationScores = {
+        regular: Number(document.getElementById('scoreRegularDuration').value) || 20,
+        long: Number(document.getElementById('scoreLongDuration').value) || 30,
+        medium: Number(document.getElementById('scoreMediumDuration').value) || 20
+      };
+      
+      // 计算个人数据导出率前十
+      const personalTop10ByRate = new Set();
+      if (userData.length > 0) {
+        // 判断是否需要按场景区分：只有"个人数据"（第一个表）才按场景区分
+        const shouldSeparateByScene = userHasScene && currentUserSheet === '个人数据';
+        let personalDataAggregated;
+        
+        if (shouldSeparateByScene) {
+          // "个人数据"表：不聚合，直接使用原始数据
+          personalDataAggregated = userData;
+        } else if (userHasScene) {
+          // "个人数据2-6"有场景数据：按模板ID聚合
+          const templateAggregated = {};
+          userData.forEach(u => {
+            if (!templateAggregated[u.id]) {
+              templateAggregated[u.id] = {
+                id: u.id,
+                usePv: 0,
+                exportPv: 0
+              };
+            }
+            templateAggregated[u.id].usePv += u.usePv;
+            templateAggregated[u.id].exportPv += u.exportPv;
+          });
+          
+          // 计算聚合后的导出率
+          personalDataAggregated = Object.values(templateAggregated).map(t => ({
+            ...t,
+            exportRate: t.usePv > 0 ? t.exportPv / t.usePv : 0
+          }));
+        } else {
+          // 没有场景数据：直接使用
+          personalDataAggregated = userData;
+        }
+        
+        const sortedPersonal = [...personalDataAggregated].sort((a, b) => (b.exportRate || 0) - (a.exportRate || 0));
+        sortedPersonal.slice(0, 10).forEach(u => personalTop10ByRate.add(String(u.id)));
+        console.log(`个人数据导出率前十模板ID (${currentUserSheet}${shouldSeparateByScene ? ',按场景区分' : ',聚合'}):`, Array.from(personalTop10ByRate));
+      }
+      
+      // 计算全体数据导出率前十（当前场景下模板数据表中导出率最高的10个模板）
+      // 排除使用PV < 100的模板，确保数据有效性
+      const globalTop10ByRate = new Set();
+      if (sceneData.length > 0) {
+        const filteredGlobal = sceneData.filter(t => t.usePv >= 100);
+        console.log(`全体数据（当前场景）：总${sceneData.length}个模板，过滤后（使用PV≥100）${filteredGlobal.length}个模板`);
+        const sortedGlobal = [...filteredGlobal].sort((a, b) => (b.exportRate || 0) - (a.exportRate || 0));
+        sortedGlobal.slice(0, 10).forEach(t => globalTop10ByRate.add(String(t.id)));
+        console.log('全体数据（当前场景）导出率前十模板ID（使用PV≥100）:', Array.from(globalTop10ByRate));
+      }
+      
+      // 为每条记录计算分数
+      const results = sceneData.map(t => {
+        // A/B：该模板在该场景的数据
+        const A = t.exportPv * coefA;
+        const B = Math.max(t.usePv - t.exportPv, 0) * coefB;
+        
+        // C/D：该模板的个人数据
+        let user;
+        if (userHasScene) {
+          // 按模板ID+场景匹配
+          const userKey = `${t.id}_${t.scene}`;
+          user = userMap[userKey] || { usePv: 0, exportPv: 0 };
+        } else {
+          // 只按模板ID匹配（聚合数据）
+          user = userMap[t.id] || { usePv: 0, exportPv: 0 };
+        }
+        
+        const C = user.exportPv * coefC;
+        const D = Math.max(user.usePv - user.exportPv, 0) * coefD;
+        
+        // 模板ID分
+        const idScore = calcIdScore(t.id);
+        
+        // 获取模板详细信息
+        const info = templateInfo[t.id] || {};
+        const templateType = info.type || '';
+        const templateRatio = info.ratio || '0';
+        const templateSlots = info.slots || 0;
+        const templateDuration = info.duration || 0;
+        
+        // 检查是否启用E/F/G新规则
+        const enableNewRules = document.getElementById('enableNewRules').checked;
+        
+        // E：模板比例分
+        const E = enableNewRules ? calcRatioScore(templateType, templateRatio, userRatio, ratioScores) : 0;
+        
+        // F：模板片段分
+        const F = enableNewRules ? calcSegmentScore(templateType, templateSlots, userSegments, segmentScores) : 0;
+        
+        // G：模板时长分
+        const G = enableNewRules ? calcDurationScore(templateType, templateDuration, durationScores) : 0;
+        
+        // 总分 = 基础分 + A - B + C - D + ID分 + E + F + G
+        const score = baseScore + A - B + C - D + idScore + E + F + G;
+        
+        return {
+          ...t,
+          name: info.name || '未命名模板',
+          type: templateType,
+          ratio: templateRatio,
+          slots: templateSlots,
+          duration: templateDuration,
+          A, B, C, D, idScore, E, F, G, score,
+          isPersonalTop10: personalTop10ByRate.has(String(t.id)),
+          isGlobalTop10: globalTop10ByRate.has(String(t.id))
+        };
+      });
+      
+      // 按分数降序排序
+      results.sort((a, b) => b.score - a.score);
+      
+      // 保存当前结果用于导出
+      currentResults = results;
+      currentScene = scene;
+      
+      // 渲染 Top 10
+      const top10 = results.slice(0, 10);
+      document.getElementById('topCards').innerHTML = top10.map(r => {
+        const info = templateInfo[r.id] || {};
+        const scenesText = info.scenes && info.scenes.length > 0 
+          ? info.scenes.join(', ') 
+          : '未设置';
+        
+        // 生成标识徽章
+        let badges = '';
+        if (r.isPersonalTop10) {
+          badges += '<span style="background:#10b981;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px;">个人TOP10</span>';
+        }
+        if (r.isGlobalTop10) {
+          badges += '<span style="background:#3b82f6;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px;">全量TOP10</span>';
+        }
+        
+        // 判断比例匹配情况，设置标题颜色（仅对UGC模板）
+        let titleColor = '#111827'; // 默认黑色
+        const templateRatio = r.ratio;
+        const userRatioValue = userRatio; // 用户设置的比例
+        
+        // 只对UGC模板进行比例颜色标记，卡点和常规模板不标记
+        if (r.type === 'UGC') {
+          // 定义近似比例关系
+          const similarRatios = {
+            '16:9': ['4:3'],
+            '4:3': ['16:9'],
+            '9:16': ['3:4'],
+            '3:4': ['9:16']
+          };
+          
+          if (templateRatio !== userRatioValue) {
+            // 检查是否为近似比例
+            const similars = similarRatios[userRatioValue] || [];
+            if (similars.includes(templateRatio)) {
+              titleColor = '#f59e0b'; // 黄色/橙色 - 近似
+            } else {
+              titleColor = '#ef4444'; // 红色 - 不匹配
+            }
+          }
+          // 如果匹配，保持默认黑色
+        }
+        
+        return `
+        <div class="card-item">
+          <h4 style="color:${titleColor};">${r.name} <span class="muted">#${r.id}</span>${badges}</h4>
+          <div class="meta">当前场景：${r.scene}${r.type ? ' | ' + r.type : ''}</div>
+          <div class="meta" style="font-size:11px;color:#8b5cf6;">支持场景：${scenesText}</div>
+          <div class="meta" style="font-size:11px;color:#666;">
+            比例:${r.ratio} | 槽位:${r.slots} | 时长:${r.duration}s
+          </div>
+          <div class="meta">得分：<strong>${r.score.toFixed(2)}</strong></div>
+          <div class="meta" style="font-size:11px;">
+            A:${r.A.toFixed(2)} B:${r.B.toFixed(2)} C:${r.C.toFixed(2)} D:${r.D.toFixed(2)} ID:${r.idScore.toFixed(4)}<br>
+            E(比例):${r.E >= 0 ? '+' : ''}${r.E.toFixed(0)} F(片段):${r.F >= 0 ? '+' : ''}${r.F.toFixed(0)} G(时长):${r.G >= 0 ? '+' : ''}${r.G.toFixed(0)}
+          </div>
+          <div class="meta" style="font-size:11px;color:#999;">
+            场景PV: ${r.usePv}使用/${r.exportPv}导出 | 导出率: ${(r.exportRate * 100).toFixed(2)}%
+          </div>
+        </div>
+      `;}).join('');
+      
+      // 渲染全部列表
+      document.getElementById('listContainer').innerHTML = results.map((r, i) => {
+        const info = templateInfo[r.id] || {};
+        const scenesText = info.scenes && info.scenes.length > 0 
+          ? '支持:' + info.scenes.join(',') 
+          : '';
+        
+        // 判断比例匹配情况，设置标题颜色（仅对UGC模板）
+        let titleColor = '#111827'; // 默认黑色
+        const templateRatio = r.ratio;
+        const userRatioValue = userRatio;
+        
+        // 只对UGC模板进行比例颜色标记，卡点和常规模板不标记
+        if (r.type === 'UGC') {
+          // 定义近似比例关系
+          const similarRatios = {
+            '16:9': ['4:3'],
+            '4:3': ['16:9'],
+            '9:16': ['3:4'],
+            '3:4': ['9:16']
+          };
+          
+          if (templateRatio !== userRatioValue) {
+            // 检查是否为近似比例
+            const similars = similarRatios[userRatioValue] || [];
+            if (similars.includes(templateRatio)) {
+              titleColor = '#f59e0b'; // 黄色/橙色 - 近似
+            } else {
+              titleColor = '#ef4444'; // 红色 - 不匹配
+            }
+          }
+        }
+        
+        // 生成标识徽章
+        let listBadges = '';
+        if (r.isPersonalTop10) {
+          listBadges += '<span style="background:#10b981;color:#fff;padding:1px 4px;border-radius:3px;font-size:9px;margin-left:4px;">个人TOP10</span>';
+        }
+        if (r.isGlobalTop10) {
+          listBadges += '<span style="background:#3b82f6;color:#fff;padding:1px 4px;border-radius:3px;font-size:9px;margin-left:4px;">全量TOP10</span>';
+        }
+        
+        return `
+        <div class="list-item">
+          <div class="muted" style="font-weight:600;">#${i + 1}</div>
+          <div>
+            <div style="color:${titleColor};">
+              ${r.name} <span class="muted">#${r.id}</span>
+              ${r.type ? `<span class="badge">${r.type}</span>` : ''}
+              ${listBadges}
+            </div>
+            <div class="muted" style="font-size:11px;">
+              PV: ${r.usePv}/${r.exportPv} | 比例:${r.ratio} 槽位:${r.slots} 时长:${r.duration}s | 
+              ${scenesText ? scenesText + ' | ' : ''}
+              分解: ${baseScore}+${r.A.toFixed(1)}-${r.B.toFixed(1)}+${r.C.toFixed(1)}-${r.D.toFixed(1)}+${r.idScore.toFixed(2)}+${r.E.toFixed(0)}+${r.F.toFixed(0)}+${r.G.toFixed(0)}
+            </div>
+          </div>
+          <div><strong>${r.score.toFixed(2)}</strong></div>
+        </div>
+      `;}).join('');
+      
+      document.getElementById('topSummary').innerText = `场景：${scene}`;
+      document.getElementById('listCount').innerText = `${results.length} 条`;
+    }
+
+    // 切换个人数据表
+    function switchUserData() {
+      const selectedSheet = document.getElementById('userDataSelect').value;
+      if (!selectedSheet) return;
+      
+      console.log(`切换个人数据表：${currentUserSheet} → ${selectedSheet}`);
+      loadUserData(selectedSheet);
+      
+      // 重新计算结果
+      compute();
+    }
+
+    // 重置参数
+    function resetParams() {
+      document.getElementById('baseScore').value = 100;
+      document.getElementById('coefA').value = 0.5;
+      document.getElementById('coefB').value = 0.05;
+      document.getElementById('coefC').value = 10;
+      document.getElementById('coefD').value = 5;
+      compute();
+    }
+
+    // 导出结果
+    function exportResults() {
+      if (!currentResults || currentResults.length === 0) {
+        alert('暂无数据可导出，请先选择场景');
+        return;
+      }
+
+      try {
+        // 获取当前参数
+        const baseScore = Number(document.getElementById('baseScore').value) || 100;
+        
+        // 构建导出数据
+        const exportData = currentResults.map((r, index) => {
+          const info = templateInfo[r.id] || {};
+          return {
+            '排名': index + 1,
+            '模板ID': r.id,
+            '模板名称': r.name || '未命名模板',
+            '模板类型': r.type || '-',
+            '模板比例': r.ratio || '-',
+            '模板槽位数': r.slots || 0,
+            '模板时长(s)': r.duration || 0,
+            '支持场景': info.scenes ? info.scenes.join(', ') : '-',
+            '当前场景': r.scene,
+            '场景使用PV': r.usePv,
+            '场景导出PV': r.exportPv,
+            '总分': Math.round(r.score * 100) / 100,
+            '基础分': baseScore,
+            'A值': Math.round(r.A * 100) / 100,
+            'B值': Math.round(r.B * 100) / 100,
+            'C值': Math.round(r.C * 100) / 100,
+            'D值': Math.round(r.D * 100) / 100,
+            'ID分': Math.round(r.idScore * 10000) / 10000,
+            'E值(比例分)': Math.round(r.E * 100) / 100,
+            'F值(片段分)': Math.round(r.F * 100) / 100,
+            'G值(时长分)': Math.round(r.G * 100) / 100,
+            '计算公式': `${baseScore}+${r.A.toFixed(2)}-${r.B.toFixed(2)}+${r.C.toFixed(2)}-${r.D.toFixed(2)}+${r.idScore.toFixed(4)}+${r.E.toFixed(0)}+${r.F.toFixed(0)}+${r.G.toFixed(0)}`
+          };
+        });
+
+        // 创建工作簿
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        
+        // 设置列宽
+        const colWidths = [
+          { wch: 6 },  // 排名
+          { wch: 12 }, // 模板ID
+          { wch: 20 }, // 模板名称
+          { wch: 10 }, // 模板类型
+          { wch: 10 }, // 模板比例
+          { wch: 12 }, // 模板槽位数
+          { wch: 12 }, // 模板时长
+          { wch: 30 }, // 支持场景
+          { wch: 15 }, // 当前场景
+          { wch: 12 }, // 场景使用PV
+          { wch: 12 }, // 场景导出PV
+          { wch: 10 }, // 总分
+          { wch: 8 },  // 基础分
+          { wch: 8 },  // A值
+          { wch: 8 },  // B值
+          { wch: 8 },  // C值
+          { wch: 8 },  // D值
+          { wch: 8 },  // ID分
+          { wch: 12 }, // E值(比例分)
+          { wch: 12 }, // F值(片段分)
+          { wch: 12 }, // G值(时长分)
+          { wch: 50 }  // 计算公式
+        ];
+        ws['!cols'] = colWidths;
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, `${currentScene}场景排名`);
+        
+        // 生成文件名
+        const date = new Date();
+        const dateStr = `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`;
+        const timeStr = `${String(date.getHours()).padStart(2,'0')}${String(date.getMinutes()).padStart(2,'0')}`;
+        const fileName = `模板推荐_${currentScene}场景_${dateStr}_${timeStr}.xlsx`;
+        
+        // 下载文件
+        XLSX.writeFile(wb, fileName);
+        
+        console.log(`导出成功：${fileName}，共${currentResults.length}条记录`);
+      } catch (e) {
+        console.error('导出失败:', e);
+        alert('导出失败: ' + e.message);
+      }
+    }
+
+    // 初始化
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('页面加载完成');
+      console.log('XLSX库状态:', typeof XLSX !== 'undefined' ? '已加载' : '未加载');
+      if (typeof XLSX === 'undefined') {
+        document.getElementById('fileStatus').innerText = 'XLSX库加载失败，请刷新页面';
+        document.getElementById('fileStatus').style.color = '#ef4444';
+      } else {
+        loadData();
+      }
+    });
+  </script>
+</body>
+</html>
