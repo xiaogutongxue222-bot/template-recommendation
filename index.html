@@ -195,6 +195,13 @@
         </div>
         
         <div class="field">
+          <label for="templateDataSelect">模板数据表</label>
+          <select id="templateDataSelect" onchange="switchTemplateData()">
+            <option value="">加载中...</option>
+          </select>
+        </div>
+        
+        <div class="field">
           <label for="sceneSelect">当前结果场景（必选）</label>
           <select id="sceneSelect" onchange="compute()">
             <option value="">请选择场景</option>
@@ -227,7 +234,11 @@
       <div style="background:#fef3f2;padding:12px;border-radius:8px;margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <h3 style="margin:0;font-size:14px;color:#b91c1c;">📊 评分参数</h3>
-          <div style="display:flex;align-items:center;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <label style="font-size:12px;margin:0;cursor:pointer;background:#dcfce7;padding:4px 8px;border-radius:4px;">
+              <input type="checkbox" id="simpleMode" onchange="toggleSimpleMode()" style="cursor:pointer;">
+              🎯 简化模式
+            </label>
             <label style="font-size:12px;margin:0;cursor:pointer;">
               <input type="checkbox" id="enableNewRules" onchange="toggleNewRules()" checked style="cursor:pointer;">
               启用E/F/G规则
@@ -235,29 +246,41 @@
           </div>
         </div>
         
+        <div id="simpleModeNote" style="display:none;background:#dcfce7;border:1px solid #86efac;padding:8px;border-radius:6px;margin-bottom:12px;font-size:11px;color:#166534;">
+          <strong>🎯 简化模式已启用：</strong><br>
+          • 只计算 A-B 分数<br>
+          • 不过滤模板信息表<br>
+          • 展示所有模板数据
+        </div>
+        
         <div class="field">
           <label>基础分</label>
-          <input id="baseScore" type="number" step="1" value="100" oninput="compute()">
+          <input id="baseScore" type="number" step="1" value="10000" oninput="compute()">
         </div>
         
         <div class="field">
-          <label>A 系数（场景导出PV）</label>
-          <input id="coefA" type="number" step="0.01" value="0.5" oninput="compute()">
+          <label>A 系数（场景导出PV，log公式）</label>
+          <input id="coefA" type="number" step="0.1" value="500" oninput="compute()">
         </div>
         
         <div class="field">
-          <label>B 系数（场景使用-导出）</label>
-          <input id="coefB" type="number" step="0.01" value="0.07" oninput="compute()">
+          <label>B 系数（场景未导出PV，log公式）</label>
+          <input id="coefB" type="number" step="0.1" value="500" oninput="compute()">
+        </div>
+        
+        <div style="font-size:11px;color:#991b1b;margin-top:4px;line-height:1.3;">
+          A分 = log(1+导出PV) × A<br>
+          B分 = log(1+未导出PV) × B
         </div>
         
         <div class="field">
           <label>C 系数（个人导出PV）</label>
-          <input id="coefC" type="number" step="0.1" value="60" oninput="compute()">
+          <input id="coefC" type="number" step="0.1" value="12" oninput="compute()">
         </div>
         
         <div class="field">
           <label>D 系数（个人使用-导出）</label>
-          <input id="coefD" type="number" step="0.1" value="30" oninput="compute()">
+          <input id="coefD" type="number" step="0.1" value="3" oninput="compute()">
         </div>
         
         <hr style="margin:12px 0;border:none;border-top:1px solid #fee2e2;">
@@ -265,64 +288,137 @@
         <!-- E/F/G 参数区（可禁用） -->
         <div id="newRulesContainer">
           <div class="field">
-            <label>E - 比例完全匹配分</label>
-            <input id="scoreRatioMatch" type="number" value="0" oninput="compute()">
+            <label>E - UGC比例完全匹配分</label>
+            <input id="scoreRatioMatch" type="number" value="50" oninput="compute()">
           </div>
           
           <div class="field">
-            <label>E - 比例近似匹配分（扣分）</label>
-            <input id="scoreRatioNear" type="number" value="-200" oninput="compute()">
+            <label>E - UGC比例近似匹配分</label>
+            <input id="scoreRatioNear" type="number" value="0" oninput="compute()">
           </div>
           
           <div class="field">
-            <label>E - 比例不匹配分（扣分）</label>
+            <label>E - UGC比例不匹配分（扣分）</label>
             <input id="scoreRatioMismatch" type="number" value="-1000" oninput="compute()">
           </div>
           
           <hr style="margin:12px 0;border:none;border-top:1px solid #fee2e2;">
           
           <div class="field">
-            <label>F - 片段匹配加分</label>
-            <input id="scoreSegmentMatch" type="number" value="20" oninput="compute()">
+            <label>F - 片段匹配加分(0.90~1.10)</label>
+            <input id="scoreSegmentMatch" type="number" value="150" oninput="compute()">
           </div>
           
           <div class="field">
-            <label>F - 片段不匹配分（扣分）</label>
-            <input id="scoreSegmentMismatch" type="number" value="-20" oninput="compute()">
+            <label>F - 片段不匹配下限（比例小于此值扣分）</label>
+            <input id="segmentMismatchLower" type="number" step="0.1" value="0.6" oninput="compute()">
+          </div>
+          
+          <div class="field">
+            <label>F - 片段不匹配上限（比例大于此值扣分）</label>
+            <input id="segmentMismatchUpper" type="number" step="0.1" value="1.5" oninput="compute()">
+          </div>
+          
+          <div class="field">
+            <label>F - 片段不匹配扣分</label>
+            <input id="scoreSegmentMismatch" type="number" value="-500" oninput="compute()">
           </div>
           
           <hr style="margin:12px 0;border:none;border-top:1px solid #fee2e2;">
           
           <div class="field">
-            <label>G - 常规模板时长分</label>
-            <input id="scoreRegularDuration" type="number" value="20" oninput="compute()">
+            <label>G - 时长分策略</label>
+            <select id="durationStrategy" onchange="toggleDurationStrategy();compute();">
+              <option value="1">策略一：时长×系数</option>
+              <option value="2" selected>策略二：分档计分</option>
+              <option value="3">策略三：反比例/正比例</option>
+            </select>
+          </div>
+          
+          <!-- 策略一参数 -->
+          <div id="durationStrategy1Params" style="display:none;">
+            <div class="field">
+              <label>G1 - 卡点/UGC时长系数</label>
+              <input id="durationMultiplier" type="number" step="0.1" value="1.6" oninput="compute()">
+            </div>
+            <div class="field">
+              <label>G1 - 常规模板固定分</label>
+              <input id="regularDurationScore1" type="number" value="20" oninput="compute()">
+            </div>
+          </div>
+          
+          <!-- 策略二参数 -->
+          <div id="durationStrategy2Params">
+            <div class="field">
+              <label>G2 - 卡点/UGC >50s分</label>
+              <input id="scoreVeryLongDuration" type="number" value="100" oninput="compute()">
+            </div>
+            <div class="field">
+              <label>G2 - 卡点/UGC >30s分</label>
+              <input id="scoreLongDuration" type="number" value="50" oninput="compute()">
+            </div>
+            <div class="field">
+              <label>G2 - 常规模板固定分</label>
+              <input id="scoreRegularDuration" type="number" value="20" oninput="compute()">
+            </div>
+          </div>
+          
+          <!-- 策略三参数 -->
+          <div id="durationStrategy3Params" style="display:none;">
+            <div class="field">
+              <label>G3 - 常规模板固定分</label>
+              <input id="regularDurationScore3" type="number" value="50" oninput="compute()">
+            </div>
+            <div class="field">
+              <label>G3 - 时长阈值(秒)</label>
+              <input id="durationThreshold" type="number" value="40" oninput="compute()">
+            </div>
+            <div class="field">
+              <label>G3 - 短时长分子(< 阈值)</label>
+              <input id="shortDurationNumerator" type="number" value="3000" oninput="compute()">
+            </div>
+            <div class="field">
+              <label>G3 - 长时长系数(≥ 阈值)</label>
+              <input id="longDurationMultiplier" type="number" step="0.1" value="2" oninput="compute()">
+            </div>
+          </div>
+          
+          <hr style="margin:12px 0;border:none;border-top:1px solid #fee2e2;">
+          
+          <div class="field">
+            <label>H - 惩罚：个人使用PV阈值</label>
+            <input id="penaltyUsePvThreshold" type="number" value="10" oninput="compute()">
           </div>
           
           <div class="field">
-            <label>G - 长时长分（>30s）</label>
-            <input id="scoreLongDuration" type="number" value="30" oninput="compute()">
+            <label>H - 惩罚：个人导出PV阈值</label>
+            <input id="penaltyExportPvThreshold" type="number" value="3" oninput="compute()">
           </div>
           
           <div class="field">
-            <label>G - 中时长分（>25s）</label>
-            <input id="scoreMediumDuration" type="number" value="20" oninput="compute()">
+            <label>H - 惩罚分值</label>
+            <input id="penaltyScore" type="number" value="-1000" oninput="compute()">
           </div>
         </div>
+        
       </div>
       
       <div class="sticky-note">
-        <strong>公式：</strong>分数 = 基础分 + A - B + C - D + ID分 <span style="color:#dc2626;">+ E + F + G</span><br>
-        <strong>A</strong> = 该模板在该场景的导出PV × 系数A<br>
-        <strong>B</strong> = 该模板在该场景的(使用-导出)PV × 系数B<br>
+        <strong>公式：</strong>分数 = 基础分 + A - B + C - D + ID分 <span style="color:#dc2626;">+ E + F + G + H</span><br>
+        <strong style="color:#15803d;">A</strong> = log(1 + 该模板在该场景的导出PV) × 系数A<br>
+        <strong style="color:#15803d;">B</strong> = log(1 + 该模板在该场景的未导出PV) × 系数B<br>
         <strong>C</strong> = 该模板在个人数据的导出PV × 系数C<br>
         <strong>D</strong> = 该模板在个人数据的(使用-导出)PV × 系数D<br>
         <strong>ID分</strong> = (模板ID % 10000) / 10000<br>
-        <span style="color:#dc2626;"><strong>📌 E/F/G 新规则（可选）：</strong></span><br>
-        <strong>E (比例分)</strong> = 卡点/常规:0 | UGC: 完全匹配0 / 近似匹配(16:9↔4:3,9:16↔3:4):-200 / 其他:-1000<br>
-        <strong>F (片段分)</strong> = 常规:0 | 卡点/UGC: 用户段数/槽位数在0.90~1.10: +20 / 否则:-20<br>
-        <strong>G (时长分)</strong> = 常规:20 | UGC/卡点: >30s:30 / >25s:20 / 其他:0<br>
-        <span style="color:#dc2626;font-size:11px;">💡 不启用E/F/G时，相当于使用传统评分系统（E=F=G=0）</span><br><br>
-        <strong style="color:#ef4444;">⚠️ 过滤规则（按顺序应用）：</strong><br>
+        <span style="color:#dc2626;"><strong>📌 E/F/G/H 新规则（可选）：</strong></span><br>
+        <strong>E (比例分)</strong> = 卡点/常规:0 | UGC: 完全匹配+50 / 近似匹配0 / 其他:-1000<br>
+        <strong>F (片段分)</strong> = 常规:0 | 卡点/UGC: 比例0.90~1.10:+150 / 比例<0.6或>1.5:-500 / 其他:0<br>
+        <strong>G (时长分)</strong> = 策略一: 卡点/UGC时长×系数 常规固定分 | 策略二: >50s/100 >30s/50 常规/20 | 策略三: 常规/50 卡点/UGC<40s/3000÷时长 ≥40s/时长×2<br>
+        <strong>H (惩罚分)</strong> = 个人使用PV>阈值 且 个人导出PV<阈值: 扣分<br>
+        <span style="color:#15803d;font-size:11px;">💡 <strong>A/B使用log公式</strong>，平滑大数值影响，促进高导出率模板</span><br>
+        <span style="color:#dc2626;font-size:11px;">💡 不启用E/F/G/H时，相当于使用传统评分系统（E=F=G=H=0）</span><br>
+        <span style="color:#16a34a;font-size:11px;"><strong>🎯 简化模式：</strong>只计算A-B分数，跳过所有过滤规则，展示全部模板数据</span><br><br>
+        <strong style="color:#ef4444;">⚠️ 过滤规则（按顺序应用，简化模式下不应用）：</strong><br>
         1. 只展示在模板信息表中存在的模板<br>
         2. 不推荐模板ID为 11000000 和 -1 的模板<br>
         3. 只推荐模板信息中"场景"列包含当前选择场景的模板<br>
@@ -333,7 +429,7 @@
         • 无场景字段的表：C/D 按模板ID匹配（聚合数据）<br>
         • 可在上方切换使用不同的个人数据表<br><br>
         <strong style="color:#10b981;">🏆 TOP10 标识说明：</strong><br>
-        • <span style="background:#10b981;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">个人TOP10</span> = 当前个人数据表中导出率前10的模板<br>
+        • <span style="background:#10b981;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">个人TOP10</span> = 当前个人数据表中导出率前10的模板（仅含模板信息表中的模板）<br>
         • <span style="background:#3b82f6;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">全量TOP10</span> = 当前场景下全体数据导出率前10的模板（需使用PV≥100）
       </div>
     </aside>
@@ -378,6 +474,8 @@
     let workbook = null;         // Excel工作簿对象
     let availableUserSheets = []; // 可用的个人数据表列表
     let currentUserSheet = '';   // 当前使用的个人数据表
+    let availableTemplateSheets = []; // 可用的模板数据表列表
+    let currentTemplateSheet = ''; // 当前使用的模板数据表
 
     // 清理场景名称
     function cleanScene(raw) {
@@ -423,12 +521,12 @@
           return 0;
         }
         
-        // 完全匹配：0分
+        // 完全匹配：+50分（scores.match默认50）
         if (templateRatio === userRatio) {
           return scores.match;
         }
         
-        // 近似匹配：16:9↔4:3 或 9:16↔3:4
+        // 近似匹配：16:9↔4:3 或 9:16↔3:4，返回0分
         const nearPairs = [
           ['16:9', '4:3'],
           ['4:3', '16:9'],
@@ -451,7 +549,7 @@
     }
 
     // 计算F分（模板片段分）
-    function calcSegmentScore(templateType, templateSlots, userSegments, scores) {
+    function calcSegmentScore(templateType, templateSlots, userSegments, scores, lowerThreshold, upperThreshold) {
       // 常规模板：0分
       if (templateType === '常规') {
         return 0;
@@ -461,32 +559,60 @@
       if ((templateType === '卡点' || templateType === 'ugc' || templateType === 'UGC') && 
           templateSlots > 0 && userSegments > 0) {
         const ratio = userSegments / templateSlots;
+        
         // 在 0.90 ~ 1.10 之间：加分
         if (ratio >= 0.90 && ratio <= 1.10) {
           return scores.match;
-        } else {
+        }
+        
+        // 比例小于下限或大于上限：扣分
+        if (ratio < lowerThreshold || ratio > upperThreshold) {
           return scores.mismatch;
         }
+        
+        // 其他情况（在阈值内但不在最佳范围）：0分
+        return 0;
       }
       
       return 0;
     }
 
     // 计算G分（模板时长分）
-    function calcDurationScore(templateType, duration, scores) {
+    function calcDurationScore(templateType, duration, strategy, scores) {
       // 常规模板：固定分数
       if (templateType === '常规') {
-        return scores.regular;
+        if (strategy === '1') {
+          return scores.regular1;
+        } else if (strategy === '2') {
+          return scores.regular2;
+        } else if (strategy === '3') {
+          return scores.regular3;
+        }
       }
       
       // UGC/卡点模板
       if (templateType === '卡点' || templateType === 'ugc' || templateType === 'UGC') {
-        if (duration > 30) {
-          return scores.long;
-        } else if (duration > 25) {
-          return scores.medium;
-        } else {
-          return 0;
+        if (strategy === '1') {
+          // 策略一：时长 × 系数
+          return duration * scores.multiplier;
+        } else if (strategy === '2') {
+          // 策略二：分档计分
+          if (duration > 50) {
+            return scores.veryLong;
+          } else if (duration > 30) {
+            return scores.long;
+          } else {
+            return 0;
+          }
+        } else if (strategy === '3') {
+          // 策略三：反比例/正比例
+          if (duration < scores.threshold) {
+            // 短时长：反比例计分
+            return scores.shortNumerator / duration;
+          } else {
+            // 长时长：正比例计分
+            return duration * scores.longMultiplier;
+          }
         }
       }
       
@@ -764,21 +890,88 @@
         availableUserSheets = wb.SheetNames.filter(name => name.startsWith('个人数据'));
         console.log('可用的个人数据表:', availableUserSheets);
         
+        // 检测所有模板数据表（从data3.xlsx）
+        availableTemplateSheets = wb.SheetNames.filter(name => name === '模板数据' || name === '模板数据2');
+        
+        // 尝试加载窗口期数据文件，添加7天和30天选项
+        try {
+          const windowRes = await fetch('使用-导出pv数据.xlsx');
+          if (windowRes.ok) {
+            const windowBuf = await windowRes.arrayBuffer();
+            const windowWb = XLSX.read(windowBuf, { type: 'array' });
+            if (windowWb.SheetNames.includes('7天')) {
+              availableTemplateSheets.push('7天窗口');
+            }
+            if (windowWb.SheetNames.includes('30天')) {
+              availableTemplateSheets.push('30天窗口');
+            }
+            // 保存窗口期workbook供后续使用
+            window.windowWorkbook = windowWb;
+            console.log('✓ 已加载窗口期数据文件');
+          }
+        } catch (windowErr) {
+          console.log('⚠️  未找到窗口期数据文件，7天/30天选项不可用');
+        }
+        
+        console.log('可用的模板数据表:', availableTemplateSheets);
+        
+        // 确定当前使用的模板数据表（默认优先选择"7天窗口"）
+        const templateDataSelect = document.getElementById('templateDataSelect');
+        let selectedTemplateSheet = templateDataSelect.value || currentTemplateSheet;
+        if (!selectedTemplateSheet || !availableTemplateSheets.includes(selectedTemplateSheet)) {
+          // 优先选择"7天窗口"，如果不存在则选第一个
+          selectedTemplateSheet = availableTemplateSheets.includes('7天窗口') ? '7天窗口' : (availableTemplateSheets[0] || '模板数据');
+        }
+        currentTemplateSheet = selectedTemplateSheet;
+        console.log('使用模板数据表:', currentTemplateSheet);
+        
         // 读取模板数据表
-        const tplSheet = wb.Sheets['模板数据'];
+        let tplSheet;
+        let tplWorkbook = wb; // 默认从data3.xlsx读取
+        let actualSheetName = currentTemplateSheet;
+        
+        // 如果选择的是窗口期数据表，从窗口期workbook读取
+        if (currentTemplateSheet === '7天窗口' || currentTemplateSheet === '30天窗口') {
+          if (window.windowWorkbook) {
+            tplWorkbook = window.windowWorkbook;
+            actualSheetName = currentTemplateSheet === '7天窗口' ? '7天' : '30天';
+          } else {
+            throw new Error('窗口期数据未加载');
+          }
+        }
+        
+        tplSheet = tplWorkbook.Sheets[actualSheetName];
         if (tplSheet) {
-          const raw = XLSX.utils.sheet_to_json(tplSheet);
+          // 模板数据2需要跳过第一行额外的标题行
+          const skipRows = actualSheetName === '模板数据2' ? 1 : 0;
+          const raw = XLSX.utils.sheet_to_json(tplSheet, skipRows > 0 ? { range: skipRows } : {});
           const tempData = raw.map(r => {
-            const cleanedScene = cleanScene(r['场景'] || '');
-            const usePv = Number(r['finish_analyze_pv'] || r['使用pv'] || 0);
-            const exportPv = Number(r['export_pv'] || r['导出pv'] || 0);
+            // 窗口期数据和普通模板数据的字段名不同
+            const isWindowData = currentTemplateSheet === '7天窗口' || currentTemplateSheet === '30天窗口';
+            
+            let cleanedScene, usePv, exportPv, templateId;
+            if (isWindowData) {
+              // 窗口期数据字段：template_id, algorithm_scene/场景, 完成分析pv, 导出pv
+              templateId = String(r['template_id'] || '');
+              cleanedScene = cleanScene(r['algorithm_scene'] || r['场景'] || '');
+              usePv = Number(r['完成分析pv'] || 0);
+              exportPv = Number(r['导出pv'] || 0);
+            } else {
+              // 普通模板数据字段：模板id, 场景, 使用pv/finish_analyze_pv, 导出pv/export_pv
+              templateId = String(r['模板id'] || '');
+              cleanedScene = cleanScene(r['场景'] || '');
+              usePv = Number(r['finish_analyze_pv'] || r['使用pv'] || 0);
+              exportPv = Number(r['export_pv'] || r['导出pv'] || 0);
+            }
+            
             // 读取导出率，如果为空或NaN，则自动计算
-            let exportRate = Number(r['导出率']);
+            let exportRate = Number(r['导出率'] || r['pv导出率']);
             if (isNaN(exportRate) || exportRate === 0) {
               exportRate = usePv > 0 ? exportPv / usePv : 0;
             }
+            
             return {
-              id: String(r['模板id'] || ''),
+              id: templateId,
               scene: normalizeScene(cleanedScene), // 标准化场景名称
               originalScene: cleanedScene, // 保留原始场景用于调试
               usePv: usePv,
@@ -805,20 +998,23 @@
           
           templateData = Object.values(mergedMap);
           console.log(`模板数据：原始${tempData.length}条 → 去重后${templateData.length}条`);
+          if (templateData.length > 0) {
+            console.log('第一条模板数据示例:', templateData[0]);
+          }
         }
         
         // 初始化个人数据表选择器
         const userDataSelect = document.getElementById('userDataSelect');
         if (availableUserSheets.length > 0) {
-          // 智能选择：优先选择序号最大的个人数据表（如个人数据3 > 个人数据2 > 个人数据）
+          // 智能选择：优先选择"个人数据7"，如果没有则选择序号最大的
           const sortedSheets = [...availableUserSheets].sort((a, b) => {
             const numA = parseInt(a.replace('个人数据', '') || '0');
             const numB = parseInt(b.replace('个人数据', '') || '0');
             return numB - numA;  // 降序排列
           });
-          const defaultSheet = sortedSheets[0];
+          const defaultSheet = availableUserSheets.includes('个人数据7') ? '个人数据7' : sortedSheets[0];
           
-          // 按序号排序显示（降序：3, 2, 1）
+          // 按序号排序显示（降序：7, 6, 5, ...)
           userDataSelect.innerHTML = sortedSheets.map(name => 
             `<option value="${name}" ${name === defaultSheet ? 'selected' : ''}>${name}</option>`
           ).join('');
@@ -827,6 +1023,15 @@
           loadUserData(defaultSheet);
         } else {
           userDataSelect.innerHTML = '<option value="">未找到个人数据表</option>';
+        }
+        
+        // 初始化模板数据表选择器
+        if (availableTemplateSheets.length > 0) {
+          templateDataSelect.innerHTML = availableTemplateSheets.map(name => 
+            `<option value="${name}" ${name === currentTemplateSheet ? 'selected' : ''}>${name}</option>`
+          ).join('');
+        } else {
+          templateDataSelect.innerHTML = '<option value="">未找到模板数据表</option>';
         }
         
         // 读取模板信息表（优先读取模板信息2，但也合并模板信息表以确保完整性）
@@ -842,7 +1047,7 @@
         infoSheets.forEach(infoSheetName => {
           const infoSheet = wb.Sheets[infoSheetName];
           if (infoSheet) {
-            const raw = XLSX.utils.sheet_to_json(infoSheet, { range: 1 }); // 从第2行开始读取
+            const raw = XLSX.utils.sheet_to_json(infoSheet); // 自动识别表头
             console.log(`  ${infoSheetName}: ${raw.length} 条原始记录`);
             if (raw.length > 0 && infoSheetName === infoSheets[0]) {
               console.log('  第一条数据示例:', raw[0]);
@@ -860,10 +1065,13 @@
               const slots = Number(r['模板槽位数'] || 0);
               const ratio = String(r['模板比例(假)'] || r['模板比例'] || '0');
               
-              // 过滤表头行
-              if (id && id !== '模板id' && name && name !== '模板名称') {
+              // 过滤表头行（只检查ID，允许名称为空）
+              if (id && id !== '模板id') {
                 // 解析场景列表（逗号分隔）
                 const sceneList = sceneStr.split(/[,，]/).map(s => s.trim()).filter(s => s);
+                
+                // 使用默认名称（如果为空）
+                const finalName = name && name !== '模板名称' ? name : `模板${id}`;
                 
                 // 如果模板ID已存在，合并场景
                 if (templateInfo[id]) {
@@ -871,9 +1079,12 @@
                   const existingScenes = templateInfo[id].scenes || [];
                   const mergedScenes = [...new Set([...existingScenes, ...sceneList])];
                   templateInfo[id].scenes = mergedScenes;
-                  // 如果名称更详细，更新名称
-                  if (name.length > templateInfo[id].name.length) {
-                    templateInfo[id].name = name;
+                  // 如果名称更详细，更新名称（优先使用非默认名称）
+                  if (finalName && finalName.length > 0 && !finalName.startsWith('模板')) {
+                    templateInfo[id].name = finalName;
+                  } else if (!templateInfo[id].name || templateInfo[id].name.startsWith('模板')) {
+                    // 如果旧名称也是默认的，更新为新名称
+                    templateInfo[id].name = finalName;
                   }
                   // 更新其他字段（保留非零值）
                   if (duration > 0) templateInfo[id].duration = duration;
@@ -883,7 +1094,7 @@
                   if (!templateInfo[id].type && type) templateInfo[id].type = type;
                 } else {
                   templateInfo[id] = { 
-                    name, 
+                    name: finalName, 
                     type, 
                     scenes: sceneList,
                     duration: duration,
@@ -905,14 +1116,18 @@
         // 提取场景列表（已经标准化过，skiing 已转为 ski）
         scenes = [...new Set(templateData.map(t => t.scene))].sort();
         console.log('可选场景列表:', scenes);
+        console.log('从模板数据表提取的场景数量:', scenes.length);
         
         // 更新场景下拉框
         const select = document.getElementById('sceneSelect');
-        select.innerHTML = '<option value="">请选择场景</option>' + 
-          scenes.map(s => `<option value="${s}">${s}</option>`).join('');
-        
-        // 默认选择第一个场景
-        if (scenes.length > 0) {
+        if (scenes.length === 0) {
+          console.warn('警告：未提取到任何场景！');
+          select.innerHTML = '<option value="">未找到场景数据</option>';
+        } else {
+          select.innerHTML = '<option value="">请选择场景</option>' + 
+            scenes.map(s => `<option value="${s}">${s}</option>`).join('');
+          
+          // 默认选择第一个场景
           select.value = scenes[0];
         }
         
@@ -953,6 +1168,40 @@
       compute();
     }
 
+    // 切换简化模式
+    function toggleSimpleMode() {
+      const enabled = document.getElementById('simpleMode').checked;
+      const note = document.getElementById('simpleModeNote');
+      
+      // 显示/隐藏提示信息
+      note.style.display = enabled ? 'block' : 'none';
+      
+      // 重新计算
+      compute();
+    }
+
+    // 切换时长分策略
+    function toggleDurationStrategy() {
+      const strategy = document.getElementById('durationStrategy').value;
+      const params1 = document.getElementById('durationStrategy1Params');
+      const params2 = document.getElementById('durationStrategy2Params');
+      const params3 = document.getElementById('durationStrategy3Params');
+      
+      // 隐藏所有策略参数
+      params1.style.display = 'none';
+      params2.style.display = 'none';
+      params3.style.display = 'none';
+      
+      // 显示对应策略的参数
+      if (strategy === '1') {
+        params1.style.display = 'block';
+      } else if (strategy === '2') {
+        params2.style.display = 'block';
+      } else if (strategy === '3') {
+        params3.style.display = 'block';
+      }
+    }
+
     // 计算推荐结果
     function compute() {
       const scene = document.getElementById('sceneSelect').value;
@@ -978,65 +1227,77 @@
       const coefC = Number(document.getElementById('coefC').value) || 0;
       const coefD = Number(document.getElementById('coefD').value) || 0;
       
+      // 检查是否启用简化模式
+      const simpleMode = document.getElementById('simpleMode').checked;
+      
       // 筛选该场景的数据
       let sceneData = templateData.filter(t => t.scene === scene);
       const beforeFilterCount = sceneData.length;
+      let afterInfoFilterCount = sceneData.length;
+      let afterBlacklistCount = sceneData.length;
       
-      // 1. 过滤：只保留在模板信息表中存在的模板
-      sceneData = sceneData.filter(t => {
-        if (!templateInfo[t.id]) {
-          console.log(`过滤：模板${t.id}不在模板信息表中`);
-          return false;
-        }
-        return true;
-      });
-      
-      const afterInfoFilterCount = sceneData.length;
-      
-      // 2. ID黑名单过滤：过滤掉不推荐的模板ID
-      const blacklistIds = ['11000000', '-1'];
-      sceneData = sceneData.filter(t => {
-        if (blacklistIds.includes(String(t.id))) {
-          console.log(`过滤：模板${t.id}在黑名单中`);
-          return false;
-        }
-        return true;
-      });
-      
-      const afterBlacklistCount = sceneData.length;
-      
-      // 3. 场景过滤：只保留模板信息中场景列包含当前场景的模板
-      // 过滤掉场景只有"通用"的模板
-      sceneData = sceneData.filter(t => {
-        const info = templateInfo[t.id];
-        // 由于前面已经过滤掉不在模板信息表中的模板，这里 info 应该总是存在
-        if (!info || !info.scenes || info.scenes.length === 0) {
-          console.log(`过滤：模板${t.id}(${info?.name || '未知'})没有场景信息`);
-          return false;
-        }
+      if (!simpleMode) {
+        // 非简化模式：应用所有过滤规则
         
-        // 如果场景列表只有"通用"，则不推荐
-        if (info.scenes.length === 1 && info.scenes[0] === '通用') {
-          console.log(`过滤：模板${t.id}(${info.name})只有"通用"场景`);
-          return false;
-        }
-        
-        // 检查场景列表是否包含当前选择的场景
-        // 特殊处理：如果选择 ski，也匹配 skiing
-        const sceneToMatch = scene.toLowerCase();
-        const matched = info.scenes.some(s => {
-          const infoScene = s.toLowerCase();
-          if (sceneToMatch === 'ski') {
-            return infoScene === 'ski' || infoScene === 'skiing';
+        // 1. 过滤：只保留在模板信息表中存在的模板
+        sceneData = sceneData.filter(t => {
+          if (!templateInfo[t.id]) {
+            console.log(`过滤：模板${t.id}不在模板信息表中`);
+            return false;
           }
-          return infoScene === sceneToMatch;
+          return true;
         });
         
-        if (!matched) {
-          console.log(`过滤：模板${t.id}(${info.name})的场景[${info.scenes.join(',')}]不包含${scene}`);
-        }
-        return matched;
-      });
+        afterInfoFilterCount = sceneData.length;
+        
+        // 2. ID黑名单过滤：过滤掉不推荐的模板ID
+        const blacklistIds = ['11000000', '-1', '1100002943', '1100004530', '1100004626', '1100004110'];
+        sceneData = sceneData.filter(t => {
+          if (blacklistIds.includes(String(t.id))) {
+            console.log(`过滤：模板${t.id}在黑名单中`);
+            return false;
+          }
+          return true;
+        });
+        
+        afterBlacklistCount = sceneData.length;
+        
+        // 3. 场景过滤：只保留模板信息中场景列包含当前场景的模板
+        // 过滤掉场景只有"通用"的模板
+        sceneData = sceneData.filter(t => {
+          const info = templateInfo[t.id];
+          // 由于前面已经过滤掉不在模板信息表中的模板，这里 info 应该总是存在
+          if (!info || !info.scenes || info.scenes.length === 0) {
+            console.log(`过滤：模板${t.id}(${info?.name || '未知'})没有场景信息`);
+            return false;
+          }
+          
+          // 如果场景列表只有"通用"，则不推荐
+          if (info.scenes.length === 1 && info.scenes[0] === '通用') {
+            console.log(`过滤：模板${t.id}(${info.name})只有"通用"场景`);
+            return false;
+          }
+          
+          // 检查场景列表是否包含当前选择的场景
+          // 特殊处理：如果选择 ski，也匹配 skiing
+          const sceneToMatch = scene.toLowerCase();
+          const matched = info.scenes.some(s => {
+            const infoScene = s.toLowerCase();
+            if (sceneToMatch === 'ski') {
+              return infoScene === 'ski' || infoScene === 'skiing';
+            }
+            return infoScene === sceneToMatch;
+          });
+          
+          if (!matched) {
+            console.log(`过滤：模板${t.id}(${info.name})的场景[${info.scenes.join(',')}]不包含${scene}`);
+          }
+          return matched;
+        });
+      } else {
+        // 简化模式：不应用任何过滤
+        console.log(`🎯 简化模式：跳过所有过滤规则`);
+      }
       
       console.log(`场景"${scene}"：初始${beforeFilterCount}个 → 模板信息表过滤后${afterInfoFilterCount}个 → 黑名单过滤后${afterBlacklistCount}个 → 场景匹配过滤后${sceneData.length}个`);
       
@@ -1072,21 +1333,59 @@
       
       // 获取E/F/G评分参数
       const ratioScores = {
-        match: Number(document.getElementById('scoreRatioMatch').value) || 0,
-        near: Number(document.getElementById('scoreRatioNear').value) || -200,
-        mismatch: Number(document.getElementById('scoreRatioMismatch').value) || -1000
+        match: Number(document.getElementById('scoreRatioMatch').value ?? 50),
+        near: Number(document.getElementById('scoreRatioNear').value ?? 0),
+        mismatch: Number(document.getElementById('scoreRatioMismatch').value ?? -1000)
       };
       
       const segmentScores = {
-        match: Number(document.getElementById('scoreSegmentMatch').value) || 20,
-        mismatch: Number(document.getElementById('scoreSegmentMismatch').value) || -20
+        match: Number(document.getElementById('scoreSegmentMatch').value ?? 150),
+        mismatch: Number(document.getElementById('scoreSegmentMismatch').value ?? -500)
       };
       
-      const durationScores = {
-        regular: Number(document.getElementById('scoreRegularDuration').value) || 20,
-        long: Number(document.getElementById('scoreLongDuration').value) || 30,
-        medium: Number(document.getElementById('scoreMediumDuration').value) || 20
+      // F分阈值参数
+      const segmentLowerThreshold = Number(document.getElementById('segmentMismatchLower').value ?? 0.6);
+      const segmentUpperThreshold = Number(document.getElementById('segmentMismatchUpper').value ?? 1.5);
+      
+      // G分策略和参数
+      const durationStrategy = document.getElementById('durationStrategy').value;
+      // G分策略参数
+      let durationScores;
+      if (durationStrategy === '1') {
+        durationScores = {
+          multiplier: Number(document.getElementById('durationMultiplier').value ?? 1.6),
+          regular1: Number(document.getElementById('regularDurationScore1').value ?? 20)
+        };
+      } else if (durationStrategy === '2') {
+        durationScores = {
+          veryLong: Number(document.getElementById('scoreVeryLongDuration').value ?? 100),
+          long: Number(document.getElementById('scoreLongDuration').value ?? 50),
+          regular2: Number(document.getElementById('scoreRegularDuration').value ?? 20)
+        };
+      } else if (durationStrategy === '3') {
+        durationScores = {
+          regular3: Number(document.getElementById('regularDurationScore3').value ?? 50),
+          threshold: Number(document.getElementById('durationThreshold').value ?? 40),
+          shortNumerator: Number(document.getElementById('shortDurationNumerator').value ?? 3000),
+          longMultiplier: Number(document.getElementById('longDurationMultiplier').value ?? 2)
+        };
+      }
+      
+      // H惩罚分参数
+      const penaltyParams = {
+        usePvThreshold: Number(document.getElementById('penaltyUsePvThreshold').value ?? 10),
+        exportPvThreshold: Number(document.getElementById('penaltyExportPvThreshold').value ?? 3),
+        score: Number(document.getElementById('penaltyScore').value ?? -1000)
       };
+      
+      // 计算每个模板的总使用PV（用于个人TOP10筛选）
+      const templateTotalUsePv = {};
+      templateData.forEach(t => {
+        if (!templateTotalUsePv[t.id]) {
+          templateTotalUsePv[t.id] = 0;
+        }
+        templateTotalUsePv[t.id] += t.usePv;
+      });
       
       // 计算个人数据导出率前十
       const personalTop10ByRate = new Set();
@@ -1123,77 +1422,131 @@
           personalDataAggregated = userData;
         }
         
-        const sortedPersonal = [...personalDataAggregated].sort((a, b) => (b.exportRate || 0) - (a.exportRate || 0));
+        // 先过滤掉不在模板信息表中的模板，再排序取TOP10（简化模式下不过滤）
+        const sortedPersonal = [...personalDataAggregated]
+          .filter(u => simpleMode || templateInfo[u.id])  // 简化模式下不过滤，否则只保留在模板信息表中的模板
+          .sort((a, b) => (b.exportRate || 0) - (a.exportRate || 0));
+        
+        const filteredOutCount = personalDataAggregated.length - sortedPersonal.length;
+        if (filteredOutCount > 0) {
+          console.log(`⚠️  个人数据中有 ${filteredOutCount} 个模板不在模板信息表中，已自动过滤`);
+        }
+        
         sortedPersonal.slice(0, 10).forEach(u => personalTop10ByRate.add(String(u.id)));
-        console.log(`个人数据导出率前十模板ID (${currentUserSheet}${shouldSeparateByScene ? ',按场景区分' : ',聚合'}):`, Array.from(personalTop10ByRate));
+        console.log(`个人数据导出率前十模板ID (${currentUserSheet}${shouldSeparateByScene ? ',按场景区分' : ',聚合'}，已排除模板信息表外的模板):`, Array.from(personalTop10ByRate));
       }
       
       // 计算全体数据导出率前十（当前场景下模板数据表中导出率最高的10个模板）
       // 排除使用PV < 100的模板，确保数据有效性
+      // 同时排除模板信息表中未涉及当前场景的模板
       const globalTop10ByRate = new Set();
       if (sceneData.length > 0) {
-        const filteredGlobal = sceneData.filter(t => t.usePv >= 100);
-        console.log(`全体数据（当前场景）：总${sceneData.length}个模板，过滤后（使用PV≥100）${filteredGlobal.length}个模板`);
+        const sceneToMatch = scene.toLowerCase();
+        const filteredGlobal = sceneData.filter(t => {
+          // 过滤条件1：使用PV >= 100
+          if (t.usePv < 100) return false;
+          
+          // 过滤条件2：模板信息表中必须包含当前场景
+          const info = templateInfo[t.id];
+          if (!info || !info.scenes || info.scenes.length === 0) return false;
+          
+          // 检查场景列表是否包含当前场景
+          const matched = info.scenes.some(s => {
+            const infoScene = s.toLowerCase();
+            if (sceneToMatch === 'ski') {
+              return infoScene === 'ski' || infoScene === 'skiing';
+            }
+            return infoScene === sceneToMatch;
+          });
+          
+          return matched;
+        });
+        console.log(`全体数据（当前场景）：总${sceneData.length}个模板，过滤后（使用PV≥100且场景匹配）${filteredGlobal.length}个模板`);
         const sortedGlobal = [...filteredGlobal].sort((a, b) => (b.exportRate || 0) - (a.exportRate || 0));
         sortedGlobal.slice(0, 10).forEach(t => globalTop10ByRate.add(String(t.id)));
-        console.log('全体数据（当前场景）导出率前十模板ID（使用PV≥100）:', Array.from(globalTop10ByRate));
+        console.log('全体数据（当前场景）导出率前十模板ID（使用PV≥100且场景匹配）:', Array.from(globalTop10ByRate));
       }
       
       // 为每条记录计算分数
       const results = sceneData.map(t => {
-        // A/B：该模板在该场景的数据
-        const A = t.exportPv * coefA;
-        const B = Math.max(t.usePv - t.exportPv, 0) * coefB;
+        // A/B：该模板在该场景的数据（使用log公式）
+        const A = Math.log(1 + t.exportPv) * coefA;
+        const unusedPv = Math.max(t.usePv - t.exportPv, 0);
+        const B = Math.log(1 + unusedPv) * coefB;
         
-        // C/D：该模板的个人数据
-        let user;
-        if (userHasScene) {
-          // 按模板ID+场景匹配
-          const userKey = `${t.id}_${t.scene}`;
-          user = userMap[userKey] || { usePv: 0, exportPv: 0 };
-        } else {
-          // 只按模板ID匹配（聚合数据）
-          user = userMap[t.id] || { usePv: 0, exportPv: 0 };
+        // 简化模式下，只计算A-B，其他分数都为0
+        let C = 0, D = 0, idScore = 0, E = 0, F = 0, G = 0, H = 0;
+        let user = { usePv: 0, exportPv: 0 };
+        let info = templateInfo[t.id] || {};
+        let actualBaseScore = simpleMode ? 0 : baseScore;
+        
+        if (!simpleMode) {
+          // 非简化模式：正常计算所有分数
+          
+          // C/D：该模板的个人数据
+          if (userHasScene) {
+            // 按模板ID+场景匹配
+            const userKey = `${t.id}_${t.scene}`;
+            user = userMap[userKey] || { usePv: 0, exportPv: 0 };
+          } else {
+            // 只按模板ID匹配（聚合数据）
+            user = userMap[t.id] || { usePv: 0, exportPv: 0 };
+          }
+          
+          C = user.exportPv * coefC;
+          D = Math.max(user.usePv - user.exportPv, 0) * coefD;
+          
+          // 模板ID分
+          idScore = calcIdScore(t.id);
+          
+          // 获取模板详细信息
+          const templateType = info.type || '';
+          const templateRatio = info.ratio || '0';
+          const templateSlots = info.slots || 0;
+          const templateDuration = info.duration || 0;
+          
+          // 检查是否启用E/F/G/H新规则
+          const enableNewRules = document.getElementById('enableNewRules').checked;
+          
+          // E：模板比例分
+          E = enableNewRules ? calcRatioScore(templateType, templateRatio, userRatio, ratioScores) : 0;
+          
+          // F：模板片段分
+          F = enableNewRules ? calcSegmentScore(templateType, templateSlots, userSegments, segmentScores, segmentLowerThreshold, segmentUpperThreshold) : 0;
+          
+          // G：模板时长分
+          G = enableNewRules ? calcDurationScore(templateType, templateDuration, durationStrategy, durationScores) : 0;
+          
+          // H：惩罚分（个人使用PV高但导出PV低）
+          if (enableNewRules && user.usePv > penaltyParams.usePvThreshold && user.exportPv < penaltyParams.exportPvThreshold) {
+            H = penaltyParams.score;
+          }
         }
         
-        const C = user.exportPv * coefC;
-        const D = Math.max(user.usePv - user.exportPv, 0) * coefD;
+        // 总分 = 基础分 + A - B + C - D + ID分 + E + F + G + H
+        // 简化模式下：总分 = A - B
+        const score = actualBaseScore + A - B + C - D + idScore + E + F + G + H;
         
-        // 模板ID分
-        const idScore = calcIdScore(t.id);
-        
-        // 获取模板详细信息
-        const info = templateInfo[t.id] || {};
-        const templateType = info.type || '';
+        // 简化模式下，为没有模板信息的模板提供默认值
+        const templateType = info.type || (simpleMode ? '-' : '');
         const templateRatio = info.ratio || '0';
         const templateSlots = info.slots || 0;
         const templateDuration = info.duration || 0;
-        
-        // 检查是否启用E/F/G新规则
-        const enableNewRules = document.getElementById('enableNewRules').checked;
-        
-        // E：模板比例分
-        const E = enableNewRules ? calcRatioScore(templateType, templateRatio, userRatio, ratioScores) : 0;
-        
-        // F：模板片段分
-        const F = enableNewRules ? calcSegmentScore(templateType, templateSlots, userSegments, segmentScores) : 0;
-        
-        // G：模板时长分
-        const G = enableNewRules ? calcDurationScore(templateType, templateDuration, durationScores) : 0;
-        
-        // 总分 = 基础分 + A - B + C - D + ID分 + E + F + G
-        const score = baseScore + A - B + C - D + idScore + E + F + G;
+        const templateName = info.name || (simpleMode ? `模板${t.id}` : '未命名模板');
         
         return {
           ...t,
-          name: info.name || '未命名模板',
+          name: templateName,
           type: templateType,
           ratio: templateRatio,
           slots: templateSlots,
           duration: templateDuration,
-          A, B, C, D, idScore, E, F, G, score,
+          A, B, C, D, idScore, E, F, G, H, score,
           isPersonalTop10: personalTop10ByRate.has(String(t.id)),
-          isGlobalTop10: globalTop10ByRate.has(String(t.id))
+          isGlobalTop10: globalTop10ByRate.has(String(t.id)),
+          personalUsePv: user.usePv,
+          personalExportPv: user.exportPv,
+          personalExportRate: user.usePv > 0 ? user.exportPv / user.usePv : 0
         };
       });
       
@@ -1259,10 +1612,13 @@
           <div class="meta">得分：<strong>${r.score.toFixed(2)}</strong></div>
           <div class="meta" style="font-size:11px;">
             A:${r.A.toFixed(2)} B:${r.B.toFixed(2)} C:${r.C.toFixed(2)} D:${r.D.toFixed(2)} ID:${r.idScore.toFixed(4)}<br>
-            E(比例):${r.E >= 0 ? '+' : ''}${r.E.toFixed(0)} F(片段):${r.F >= 0 ? '+' : ''}${r.F.toFixed(0)} G(时长):${r.G >= 0 ? '+' : ''}${r.G.toFixed(0)}
+            E(比例):${r.E >= 0 ? '+' : ''}${r.E.toFixed(0)} F(片段):${r.F >= 0 ? '+' : ''}${r.F.toFixed(0)} G(时长):${r.G >= 0 ? '+' : ''}${r.G.toFixed(0)} H(惩罚):${r.H >= 0 ? '+' : ''}${r.H.toFixed(0)}
           </div>
           <div class="meta" style="font-size:11px;color:#999;">
             场景PV: ${r.usePv}使用/${r.exportPv}导出 | 导出率: ${(r.exportRate * 100).toFixed(2)}%
+          </div>
+          <div class="meta" style="font-size:11px;color:#10b981;">
+            个人PV: ${r.personalUsePv}使用/${r.personalExportPv}导出 | 导出率: ${(r.personalExportRate * 100).toFixed(2)}%
           </div>
         </div>
       `;}).join('');
@@ -1321,7 +1677,7 @@
             <div class="muted" style="font-size:11px;">
               PV: ${r.usePv}/${r.exportPv} | 比例:${r.ratio} 槽位:${r.slots} 时长:${r.duration}s | 
               ${scenesText ? scenesText + ' | ' : ''}
-              分解: ${baseScore}+${r.A.toFixed(1)}-${r.B.toFixed(1)}+${r.C.toFixed(1)}-${r.D.toFixed(1)}+${r.idScore.toFixed(2)}+${r.E.toFixed(0)}+${r.F.toFixed(0)}+${r.G.toFixed(0)}
+              分解: ${baseScore}+${r.A.toFixed(1)}-${r.B.toFixed(1)}+${r.C.toFixed(1)}-${r.D.toFixed(1)}+${r.idScore.toFixed(2)}+${r.E.toFixed(0)}+${r.F.toFixed(0)}+${r.G.toFixed(0)}+${r.H.toFixed(0)}
             </div>
           </div>
           <div><strong>${r.score.toFixed(2)}</strong></div>
@@ -1344,13 +1700,56 @@
       compute();
     }
 
+    // 切换模板数据表
+    function switchTemplateData() {
+      const selectedSheet = document.getElementById('templateDataSelect').value;
+      if (!selectedSheet) return;
+      
+      console.log(`切换模板数据表：${currentTemplateSheet} → ${selectedSheet}`);
+      currentTemplateSheet = selectedSheet;
+      
+      // 重新加载所有数据
+      loadData();
+    }
+
     // 重置参数
     function resetParams() {
-      document.getElementById('baseScore').value = 100;
-      document.getElementById('coefA').value = 0.5;
-      document.getElementById('coefB').value = 0.05;
-      document.getElementById('coefC').value = 10;
-      document.getElementById('coefD').value = 5;
+      document.getElementById('baseScore').value = 10000;
+      document.getElementById('coefA').value = 500;
+      document.getElementById('coefB').value = 500;
+      document.getElementById('coefC').value = 12;
+      document.getElementById('coefD').value = 3;
+      
+      // E/F/G/H参数
+      document.getElementById('scoreRatioMatch').value = 50;
+      document.getElementById('scoreRatioNear').value = 0;
+      document.getElementById('scoreRatioMismatch').value = -1000;
+      document.getElementById('scoreSegmentMatch').value = 150;
+      document.getElementById('segmentMismatchLower').value = 0.6;
+      document.getElementById('segmentMismatchUpper').value = 1.5;
+      document.getElementById('scoreSegmentMismatch').value = -500;
+      
+      // G策略默认为策略二
+      document.getElementById('durationStrategy').value = '2';
+      // 策略一参数
+      document.getElementById('durationMultiplier').value = 1.6;
+      document.getElementById('regularDurationScore1').value = 20;
+      // 策略二参数
+      document.getElementById('scoreVeryLongDuration').value = 100;
+      document.getElementById('scoreLongDuration').value = 50;
+      document.getElementById('scoreRegularDuration').value = 20;
+      // 策略三参数
+      document.getElementById('regularDurationScore3').value = 50;
+      document.getElementById('durationThreshold').value = 40;
+      document.getElementById('shortDurationNumerator').value = 3000;
+      document.getElementById('longDurationMultiplier').value = 2;
+      toggleDurationStrategy();
+      
+      // H惩罚分
+      document.getElementById('penaltyUsePvThreshold').value = 10;
+      document.getElementById('penaltyExportPvThreshold').value = 3;
+      document.getElementById('penaltyScore').value = -1000;
+      
       compute();
     }
 
@@ -1363,7 +1762,7 @@
 
       try {
         // 获取当前参数
-        const baseScore = Number(document.getElementById('baseScore').value) || 100;
+        const baseScore = Number(document.getElementById('baseScore').value) || 10000;
         
         // 构建导出数据
         const exportData = currentResults.map((r, index) => {
@@ -1380,6 +1779,10 @@
             '当前场景': r.scene,
             '场景使用PV': r.usePv,
             '场景导出PV': r.exportPv,
+            '场景导出率': Math.round(r.exportRate * 10000) / 100 + '%',
+            '个人使用PV': r.personalUsePv || 0,
+            '个人导出PV': r.personalExportPv || 0,
+            '个人导出率': Math.round((r.personalExportRate || 0) * 10000) / 100 + '%',
             '总分': Math.round(r.score * 100) / 100,
             '基础分': baseScore,
             'A值': Math.round(r.A * 100) / 100,
@@ -1390,7 +1793,10 @@
             'E值(比例分)': Math.round(r.E * 100) / 100,
             'F值(片段分)': Math.round(r.F * 100) / 100,
             'G值(时长分)': Math.round(r.G * 100) / 100,
-            '计算公式': `${baseScore}+${r.A.toFixed(2)}-${r.B.toFixed(2)}+${r.C.toFixed(2)}-${r.D.toFixed(2)}+${r.idScore.toFixed(4)}+${r.E.toFixed(0)}+${r.F.toFixed(0)}+${r.G.toFixed(0)}`
+            'H值(惩罚分)': Math.round(r.H * 100) / 100,
+            '是否个人TOP10': r.isPersonalTop10 ? '是' : '否',
+            '是否全量TOP10': r.isGlobalTop10 ? '是' : '否',
+            '计算公式': `${baseScore}+${r.A.toFixed(2)}-${r.B.toFixed(2)}+${r.C.toFixed(2)}-${r.D.toFixed(2)}+${r.idScore.toFixed(4)}+${r.E.toFixed(0)}+${r.F.toFixed(0)}+${r.G.toFixed(0)}+${r.H.toFixed(0)}`
           };
         });
 
@@ -1457,3 +1863,4 @@
   </script>
 </body>
 </html>
+
